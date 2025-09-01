@@ -1,0 +1,99 @@
+# LLM Eval Simple
+
+A simple tool for evaluating Large Language Models (LLMs) using a set of prompts and expected answers. It supports testing multiple models via an OpenAI-compatible API endpoint, measures response times, evaluates correctness (using an optional evaluator model or exact matching), and generates a summary report in tabular format.
+
+This script is useful for benchmarking LLM performance on custom datasets, such as accuracy on specific tasks or questions.
+
+## Features
+- Batch testing of multiple models.
+- Automatic evaluation using an evaluator model or fallback to exact string matching.
+- Response time tracking.
+- Detailed per-prompt results and aggregated summary tables.
+- Configurable via environment variables (e.g., model names, API endpoint).
+
+## Prerequisites
+- Python 3.8+.
+- [uv](https://github.com/astral-sh/uv) installed for dependency management (a fast alternative to pip and venv).
+- Access to an OpenAI-compatible API endpoint (e.g., local server or hosted service) for model inference.
+- Directories for prompts and answers (created automatically if missing).
+
+## Installation
+1. Clone the repository:
+   ```
+   git clone <repository-url>
+   cd llm-eval-simple
+   ```
+
+2. Install dependencies using uv:
+   ```
+   uv sync
+   ```
+   This will create a virtual environment and install all required packages from `pyproject.toml` or `requirements.txt`.
+
+   If you prefer not to use uv, you can manually install dependencies:
+   ```
+   python -m venv .venv
+   source .venv/bin/activate  # On Unix-based systems
+   # or .venv\Scripts\activate on Windows
+   pip install -r requirements.txt
+   ```
+   Note: The script assumes uv for running, but you can adapt it for standard Python.
+
+## Configuration
+1. Create a `.env` file in the root directory based on `.env.example`:
+   ```
+   cp .env.example .env
+   ```
+   Edit `.env` with your settings:
+   - `PROMPT_DIR`: Directory for prompt files (default: `prompts`).
+   - `ANSWER_DIR`: Directory for expected answer files (default: `answers`).
+   - `ENDPOINT_URL`: Your OpenAI-compatible API endpoint (default: `http://localhost:9292/v1/chat/completions`).
+   - `MODEL_NAMES`: Comma-separated list of model names to test (e.g., `gemma-3-270m-it-Q4_K_M,Qwen3-8B-Q4_K_M`).
+   - `MODEL_EVALUATOR`: Optional model name for evaluating correctness (if empty, uses exact matching).
+
+2. Prepare your test data:
+   - Place prompt files in the `prompts` directory (e.g., `1-math-question.txt`).
+   - Place corresponding expected answer files in the `answers` directory with matching names (e.g., `1-math-question.txt`).
+   - Files should contain plain text: prompts for input to the model, answers for comparison.
+   - Use consistent naming and ensure files are UTF-8 encoded.
+
+## Usage
+Run the evaluation script:
+```
+uv run python main.py
+```
+- This will process all prompt files, test each model, evaluate results, and print detailed per-file results followed by a summary table.
+- Output includes:
+  - Per-model testing logs.
+  - Detailed table with model, file, correctness, and response time.
+  - Summary table with accuracy percentage and average response time.
+
+Example output snippet:
+```
+Detailed Results
++----------+-------------------+-----------+-----------------+
+| Model    | File              | Correct   | Response Time   |
++==========+===================+===========+=================+
+| model1   | 1-example.txt     | Yes       | 1.23s           |
++----------+-------------------+-----------+-----------------+
+
+Model Performance Summary
++----------+---------------------+-----------------------+
+| Model    | Correct             | Avg Response Time     |
++==========+=====================+=======================+
+| model1   | 5/10 (50.0%)        | 2.45s                 |
++----------+---------------------+-----------------------+
+```
+
+## Troubleshooting
+- **API Errors**: Ensure your endpoint is running and accessible. Check the URL and model names in `.env`.
+- **Evaluator Failures**: If using `MODEL_EVALUATOR`, it should return "CORRECT" or "INCORRECT". The script now handles variations like "not correct".
+- **No Matching Answers**: The script skips prompts without corresponding answer files.
+- **Dependencies**: If uv is not installed, download it from [astral-sh/uv](https://github.com/astral-sh/uv).
+- **Customization**: Modify `main.py` for advanced features, like adding more metrics or output formats.
+
+## Contributing
+Feel free to open issues or pull requests for improvements, such as additional evaluators or export options (e.g., CSV output).
+
+## License
+MIT License. See `LICENSE` for details.
