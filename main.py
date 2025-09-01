@@ -5,22 +5,28 @@ import requests
 import json
 from tabulate import tabulate
 from dotenv import load_dotenv
+import argparse
 
 # Load environment variables from .env file if it exists
 load_dotenv()
 
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description="Test models on prompts with optional filtering.")
+parser.add_argument('--pattern', type=str, default="*", help="Glob pattern to filter prompt files (e.g., '*CODE*')")
+args = parser.parse_args()
+
 # Configuration - load from environment variables or use defaults
-prompt_dir = os.getenv("PROMPT_DIR", "prompts")
-answer_dir = os.getenv("ANSWER_DIR", "answers")
+prompt_dir = "prompts"
+answer_dir = "answers"
 endpoint_url = os.getenv("ENDPOINT_URL", "http://localhost:9292/v1/chat/completions")
 model_names_str = os.getenv("MODEL_NAMES", "gemma-3-270m-it-Q4_K_M,Qwen3-8B-Q4_K_M")
-model_evaluator = os.getenv("MODEL_EVALUATOR", "")
+model_evaluator = os.getenv("MODEL_EVALUATOR", "some-quite-powerful-model-8B")
 
 # Convert comma-separated model names string to list
 model_names = [name.strip() for name in model_names_str.split(",") if name.strip()]
 
-# List all prompt files
-prompt_files = sorted(glob.glob(os.path.join(prompt_dir, "*")))
+# List prompt files based on the pattern
+prompt_files = sorted(glob.glob(os.path.join(prompt_dir, args.pattern)))
 
 # Results table
 results = []
@@ -71,7 +77,7 @@ for model_name in model_names:
                 eval_payload = {
                     "model": model_evaluator,
                     "messages": [
-                        {"role": "system", "content": "You are a strict evaluator. Compare the expected answer with the generated answer and respond with only 'CORRECT' or 'INCORRECT'."},
+                        {"role": "system", "content": "You are an evaluator. Compare the expected answer with the generated answer, ignore the tag <think> content, the generated answers may vary slightly in wording but should preserve the original meaning, and respond with only 'CORRECT' or 'INCORRECT'"},
                         {"role": "user", "content": f"Expected Answer: {expected_answer}\nGenerated Answer: {generated_answer}"}
                     ],
                     "stream": False
