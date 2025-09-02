@@ -11,3 +11,4 @@ wheels/
 .env
 prompts/*
 answers/*
+answers-generated/*
