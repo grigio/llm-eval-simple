@@ -48,6 +48,7 @@ This script is useful for benchmarking LLM performance on custom datasets, such 
    - `PROMPT_DIR`: Directory for prompt files (default: `prompts`).
    - `ANSWER_DIR`: Directory for expected answer files (default: `answers`).
    - `ENDPOINT_URL`: Your OpenAI-compatible API endpoint (default: `http://localhost:9292/v1/chat/completions`).
+   - `API_KEY`: Your API key for authentication with the OpenAI-compatible API (optional).
    - `MODEL_NAMES`: Comma-separated list of model names to test (e.g., `gemma-3-270m-it-Q4_K_M,Qwen3-8B-Q4_K_M`).
    - `MODEL_EVALUATOR`: Optional model name for evaluating correctness (if empty, uses exact matching).
 
