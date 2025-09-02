@@ -145,7 +145,7 @@ def print_summary(results: List[Dict[str, Any]]):
 
     # Detailed table
     detailed_table = [
-        [r["model"], r["file"], "✅" if r["correct"] else "❌", f"{r['response_time']:.2f}s"]
+        [r["model"], r["file"], "🮱" if r["correct"] else "𐄂", f"{r['response_time']:.2f}s"]
         for r in results
     ]
     print("\nDetailed Results")
