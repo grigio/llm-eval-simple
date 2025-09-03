@@ -30,7 +30,7 @@ def load_config() -> Config:
 
     parser = argparse.ArgumentParser(description="Test models on prompts with optional filtering.")
     parser.add_argument('--pattern', type=str, default="prompts/*", help="Glob pattern to filter prompt files (e.g., '*CODE*')")
-    parser.add_argument('--actions', type=str, default="answer,evaluate,render", help="Comma-separated list of actions to perform (answer,evaluate,render)")
+    parser.add_argument('--actions', type=str, default="answer,evaluate,render,renderhtml", help="Comma-separated list of actions to perform (answer,evaluate,render,renderhtml)")
     args = parser.parse_args()
 
     model_names_str = os.getenv("MODEL_NAMES", "gemma-3-270m-it-Q4_K_M,Qwen3-8B-Q4_K_M")
@@ -110,6 +110,7 @@ def get_prompt_files(pattern: str) -> List[str]:
 GENERATED_ANSWERS_DIR = "answers-generated"
 RAW_REPORT_PATH = os.path.join(GENERATED_ANSWERS_DIR, "report.json")
 EVALUATED_REPORT_PATH = os.path.join(GENERATED_ANSWERS_DIR, "report-evaluated.json")
+HTML_REPORT_PATH = os.path.join(GENERATED_ANSWERS_DIR, "report-evaluated.html")
 
 
 # --- Action Functions ---
@@ -209,6 +210,154 @@ def render(config: Config):
     
     print_summary(results)
 
+def renderhtml(config: Config):
+    """Renders the final report as an HTML file."""
+    print("\n--- Rendering HTML Report ---")
+    try:
+        with open(EVALUATED_REPORT_PATH, 'r', encoding='utf-8') as f:
+            results = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: {EVALUATED_REPORT_PATH} not found. Please run the 'evaluate' action first.")
+        return
+
+    # Group results by file
+    results_by_file = {}
+    for r in results:
+        if r['file'] not in results_by_file:
+            results_by_file[r['file']] = {
+                "prompt": r['prompt'],
+                "expected": r['expected'],
+                "models": []
+            }
+        results_by_file[r['file']]['models'].append(r)
+
+    # Calculate summary
+    model_summary = {}
+    for r in results:
+        model = r["model"]
+        if model not in model_summary:
+            model_summary[model] = {"total": 0, "correct": 0, "total_time": 0}
+        
+        model_summary[model]["total"] += 1
+        if r["correct"]:
+            model_summary[model]["correct"] += 1
+        model_summary[model]["total_time"] += r["response_time"]
+
+    # --- HTML Generation ---
+    html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Evaluation Report</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; background-color: #f4f4f9; color: #333; }
+        h1, h2 { color: #444; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 2em; box-shadow: 0 2px 3px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #667292; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        .summary-bar { background-color: #ddd; border-radius: 3px; overflow: hidden; }
+        .summary-bar-fill { background-color: #4CAF50; height: 20px; text-align: center; color: white; line-height: 20px; }
+        .details { margin-bottom: 1.5em; }
+        .question { background-color: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 5px; }
+        .question-header { cursor: pointer; font-weight: bold; font-size: 1.2em; }
+        .models-container { display: none; padding-top: 10px; }
+        .model-answer { border-left: 4px solid #ccc; padding-left: 15px; margin-top: 10px; }
+        .model-answer.incorrect { border-left-color: #e57373; background-color: #ffcdd2; }
+        .model-answer.correct { border-left-color: #81c784; }
+        pre { background-color: #eee; padding: 10px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+    <h1>Model Evaluation Report</h1>
+    
+    <h2>Model Performance Summary</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Model</th>
+                <th>Correct</th>
+                <th>Avg Response Time</th>
+            </tr>
+        </thead>
+        <tbody>
+"""
+    for model, stats in model_summary.items():
+        total = stats["total"]
+        correct = stats["correct"]
+        total_time = stats["total_time"]
+        accuracy = (correct / total) * 100 if total > 0 else 0
+        avg_time = total_time / total if total > 0 else 0
+        html += f"""
+            <tr>
+                <td>{model}</td>
+                <td>
+                    {correct}/{total} ({accuracy:.1f}%)
+                    <div class="summary-bar">
+                        <div class="summary-bar-fill" style="width: {accuracy:.1f}%;"></div>
+                    </div>
+                </td>
+                <td>{avg_time:.2f}s</td>
+            </tr>
+"""
+    html += """
+        </tbody>
+    </table>
+
+    <h2>Detailed Results</h2>
+    <div class="details">
+"""
+    for file, data in results_by_file.items():
+        html += f"""
+        <div class="question">
+            <div class="question-header" onclick="toggleDetails(this)">&#9654; {file}</div>
+            <div class="models-container">
+                <p><strong>Prompt:</strong></p>
+                <pre>{data['prompt']}</pre>
+                <p><strong>Expected Answer:</strong></p>
+                <pre>{data['expected']}</pre>
+                <hr>
+"""
+        for model_result in data['models']:
+            correct_class = "correct" if model_result['correct'] else "incorrect"
+            html += f"""
+                <div class="model-answer {correct_class}">
+                    <h4>{model_result['model']}</h4>
+                    <p><strong>Generated Answer:</strong></p>
+                    <pre>{model_result['generated']}</pre>
+                    <p><em>Response Time: {model_result['response_time']:.2f}s</em></p>
+                </div>
+"""
+        html += """
+            </div>
+        </div>
+"""
+    html += """
+    </div>
+
+    <script>
+        function toggleDetails(element) {
+            const container = element.nextElementSibling;
+            if (container.style.display === "block") {
+                container.style.display = "none";
+                element.innerHTML = element.innerHTML.replace('&#9660;', '&#9654;');
+            } else {
+                container.style.display = "block";
+                element.innerHTML = element.innerHTML.replace('&#9654;', '&#9660;');
+            }
+        }
+    </script>
+</body>
+</html>
+"""
+    with open(HTML_REPORT_PATH, 'w', encoding='utf-8') as f:
+        f.write(html)
+    
+    print(f"\nHTML report generated. Report saved to {HTML_REPORT_PATH}")
+
+
 # --- Reporting ---
 
 def print_summary(results: List[Dict[str, Any]]):
@@ -271,6 +420,8 @@ def main():
         evaluate(config)
     if "render" in config.actions:
         render(config)
+    if "renderhtml" in config.actions:
+        renderhtml(config)
 
 if __name__ == "__main__":
     main()
