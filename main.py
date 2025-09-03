@@ -22,6 +22,7 @@ class Config:
     pattern: str = "*"
     actions: List[str] = field(default_factory=list)
     api_key: str = None
+    throttling_secs: float = 0.1
 
 def load_config() -> Config:
     """Loads configuration from environment variables and command-line arguments."""
@@ -43,13 +44,15 @@ def load_config() -> Config:
         model_evaluator=os.getenv("MODEL_EVALUATOR", "some-quite-powerful-model-8B"),
         pattern=args.pattern,
         actions=[action.strip() for action in args.actions.split(',')],
-        api_key=os.getenv("API_KEY")
+        api_key=os.getenv("API_KEY"),
+        throttling_secs=float(os.getenv("THROTTLING_SECS", 0.1))
     )
 
 # --- API Interaction ---
 
-def get_model_response(endpoint_url: str, model: str, prompt: str, system_prompt: str = None, api_key: str = None) -> Dict[str, Any]:
+def get_model_response(config: Config, model: str, prompt: str, system_prompt: str = None) -> Dict[str, Any]:
     """Gets a response from the specified model."""
+    time.sleep(config.throttling_secs)
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
@@ -62,16 +65,16 @@ def get_model_response(endpoint_url: str, model: str, prompt: str, system_prompt
     }
     headers = {"Content-Type": "application/json"}
     
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+    if config.api_key:
+        headers["Authorization"] = f"Bearer {config.api_key}"
     
-    response = requests.post(endpoint_url, json=payload, headers=headers)
+    response = requests.post(config.endpoint_url, json=payload, headers=headers)
     response.raise_for_status()
     return response.json()
 
 # --- Evaluation ---
 
-def evaluate_correctness(endpoint_url: str, evaluator_model: str, expected_answer: str, generated_answer: str, api_key: str = None) -> bool:
+def evaluate_correctness(config: Config, evaluator_model: str, expected_answer: str, generated_answer: str) -> bool:
     """Evaluates the correctness of a generated answer using an evaluator model."""
     if not evaluator_model:
         return generated_answer.lower() == expected_answer.lower()
@@ -80,7 +83,7 @@ def evaluate_correctness(endpoint_url: str, evaluator_model: str, expected_answe
     user_prompt = f"Expected Answer: {expected_answer}\nGenerated Answer: {generated_answer}"
     
     try:
-        eval_response = get_model_response(endpoint_url, evaluator_model, user_prompt, system_prompt, api_key)
+        eval_response = get_model_response(config, evaluator_model, user_prompt, system_prompt)
         eval_result = eval_response.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
         
         # NOTE: keep this to debug evaluator model
@@ -127,7 +130,7 @@ def answer_prompt(prompt_path: str, model_name: str, config: Config) -> Dict[str
 
     start_time = time.time()
     try:
-        response_json = get_model_response(config.endpoint_url, model_name, prompt, api_key=config.api_key)
+        response_json = get_model_response(config, model_name, prompt)
         end_time = time.time()
         
         generated_answer = response_json.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
@@ -179,11 +182,10 @@ def evaluate(config: Config):
     evaluated_results = []
     for result in results:
         is_correct = evaluate_correctness(
-            config.endpoint_url, 
+            config,
             config.model_evaluator, 
             result["expected"], 
-            result["generated"],
-            config.api_key
+            result["generated"]
         )
         result["correct"] = is_correct
         result["evaluator_model"] = config.model_evaluator
