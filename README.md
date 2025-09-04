@@ -100,7 +100,7 @@ Run the evaluation script:
 ```
 uv run python main.py
 # you can activate the actions separately and also the prompts
-uv run main.py --actions answer,evaluate,render --pattern "prompts/REASON*"
+uv run main.py --actions answer,evaluate,render,renderhtml --pattern "prompts/REASON*"
 ```
 - This will process all prompt files, test each model, evaluate results, and print detailed per-file results followed by a summary table.
 - Output includes:
