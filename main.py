@@ -271,6 +271,54 @@ def renderhtml(config: Config):
         .model-answer.incorrect { border-left-color: #e57373; background-color: #ffcdd2; }
         .model-answer.correct { border-left-color: #81c784; }
         pre { background-color: #eee; padding: 10px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
+        
+        /* Overlay styles */
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .overlay-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 80%;
+            max-height: 80%;
+            overflow: auto;
+            position: relative;
+        }
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+        .close-btn:hover {
+            color: #000;
+        }
+        .cell-data {
+            margin-top: 15px;
+        }
+        .cell-data h3 {
+            margin-top: 0;
+            color: #444;
+        }
+        .cell-data pre {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>
@@ -315,6 +363,12 @@ def renderhtml(config: Config):
     prompts = sorted(list(set(r["file"] for r in results)))
     models = sorted(list(set(r["model"] for r in results)))
 
+    # Find min and max response times for normalization
+    all_response_times = [r["response_time"] for r in results]
+    min_time = min(all_response_times)
+    max_time = max(all_response_times)
+    time_range = max_time - min_time if max_time != min_time else 1
+
     html += "<table><thead><tr><th>Model</th>"
     for prompt in prompts:
         html += f"<th>{prompt}</th>"
@@ -323,12 +377,32 @@ def renderhtml(config: Config):
     for model in models:
         html += f"<tr><td>{model}</td>"
         for prompt in prompts:
-            cell_class = "cell-gray"
+            cell_style = ""
             for r in results:
                 if r["model"] == model and r["file"] == prompt:
-                    cell_class = "cell-green" if r["correct"] else "cell-red"
+                    # Normalize response time to 0-1 (0 is fastest, 1 is slowest)
+                    normalized_time = (r["response_time"] - min_time) / time_range
+                    
+                    if r["correct"]:
+                        # For correct answers: interpolate from #00f700 (fast) to #f5fff5 (slow)
+                        # Convert hex to RGB
+                        r_fast, g_fast, b_fast = 0, 247, 0      # #00f700
+                        r_slow, g_slow, b_slow = 245, 255, 245  # #f5fff5
+                        
+                        # Interpolate RGB values
+                        r = int(r_fast + (r_slow - r_fast) * normalized_time)
+                        g = int(g_fast + (g_slow - g_fast) * normalized_time)
+                        b = int(b_fast + (b_slow - b_fast) * normalized_time)
+                        
+                        cell_style = f' style="background-color: rgb({r}, {g}, {b});"'
+                    else:
+                        # For incorrect answers, use red with varying lightness
+                        lightness = int(70 + 30 * normalized_time)  # 70% to 100%
+                        cell_style = f' style="background-color: hsl(0, 100%, {lightness}%);"'
                     break
-            html += f'<td class="{cell_class}"></td>'
+            # Add click handler and data attribute to cells
+            cell_id = f"{model}-{prompt}"
+            html += f'<td{cell_style} data-cell-id="{cell_id}" onclick="showOverlay(\'{cell_id}\')"></td>'
         html += "</tr>"
     html += "</tbody></table>"
 
@@ -364,6 +438,14 @@ def renderhtml(config: Config):
     html += """
     </div>
 
+    <!-- Overlay for cell details -->
+    <div id="overlay" class="overlay">
+        <div class="overlay-content">
+            <span class="close-btn" onclick="closeOverlay()">&times;</span>
+            <div id="overlay-data" class="cell-data"></div>
+        </div>
+    </div>
+
     <script>
         function toggleDetails(element) {
             const container = element.nextElementSibling;
@@ -373,6 +455,56 @@ def renderhtml(config: Config):
             } else {
                 container.style.display = "block";
                 element.innerHTML = element.innerHTML.replace('&#9654;', '&#9660;');
+            }
+        }
+        
+        // Data for all cells
+        const cellData = {
+"""
+    
+    # Add data for each cell
+    for r in results:
+        cell_id = f"{r['model']}-{r['file']}"
+        # Escape quotes and newlines in the generated answer
+        escaped_answer = r['generated'].replace('"', '\\"').replace('\n', '\\n')
+        html += f'            "{cell_id}": {{\n'
+        html += f'                "model": "{r["model"]}",\n'
+        html += f'                "file": "{r["file"]}",\n'
+        html += f'                "generated": "{escaped_answer}",\n'
+        html += f'                "response_time": {r["response_time"]:.2f},\n'
+        html += f'                "correct": {str(r["correct"]).lower()}\n'
+        html += f'            }},\n'
+    
+    html += """
+        };
+        
+        function showOverlay(cellId) {
+            const data = cellData[cellId];
+            if (!data) return;
+            
+            const overlay = document.getElementById('overlay');
+            const overlayData = document.getElementById('overlay-data');
+            
+            overlayData.innerHTML = `
+                <h3>${data.model} - ${data.file}</h3>
+                <p><strong>Status:</strong> ${data.correct ? 'Correct' : 'Incorrect'}</p>
+                <p><strong>Response Time:</strong> ${data.response_time}s</p>
+                <h4>Generated Answer:</h4>
+                <pre>${data.generated}</pre>
+            `;
+            
+            overlay.style.display = 'flex';
+        }
+        
+        function closeOverlay() {
+            document.getElementById('overlay').style.display = 'none';
+        }
+        
+        // Close overlay when clicking outside the content
+        window.onclick = function(event) {
+            const overlay = document.getElementById('overlay');
+            if (event.target === overlay) {
+                closeOverlay();
             }
         }
     </script>
