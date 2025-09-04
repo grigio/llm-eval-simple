@@ -256,6 +256,9 @@ def renderhtml(config: Config):
         h1, h2 { color: #444; }
         table { border-collapse: collapse; width: 100%; margin-bottom: 2em; box-shadow: 0 2px 3px rgba(0,0,0,0.1); }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        td.cell-green { background-color: #81c784; }
+        td.cell-red { background-color: #e57373; }
+        td.cell-gray { background-color: #ccc; }
         th { background-color: #667292; color: white; }
         tr:nth-child(even) { background-color: #f2f2f2; }
         .summary-bar { background-color: #ddd; border-radius: 3px; overflow: hidden; }
@@ -307,6 +310,30 @@ def renderhtml(config: Config):
     </table>
 
     <h2>Detailed Results</h2>
+"""
+    # --- Generate HTML for the new results grid ---
+    prompts = sorted(list(set(r["file"] for r in results)))
+    models = sorted(list(set(r["model"] for r in results)))
+
+    html += "<table><thead><tr><th>Model</th>"
+    for prompt in prompts:
+        html += f"<th>{prompt}</th>"
+    html += "</tr></thead><tbody>"
+
+    for model in models:
+        html += f"<tr><td>{model}</td>"
+        for prompt in prompts:
+            cell_class = "cell-gray"
+            for r in results:
+                if r["model"] == model and r["file"] == prompt:
+                    cell_class = "cell-green" if r["correct"] else "cell-red"
+                    break
+            html += f'<td class="{cell_class}"></td>'
+        html += "</tr>"
+    html += "</tbody></table>"
+
+
+    html += """
     <div class="details">
 """
     for file, data in results_by_file.items():
@@ -368,11 +395,34 @@ def print_summary(results: List[Dict[str, Any]]):
 
     # Detailed table
     detailed_table = [
-        [r["model"], r["file"], "🮱" if r["correct"] else "𐄂", f"{r['response_time']:.2f}s"]
+        [r["model"], r["file"], "correct" if r["correct"] else "wrong", f"{r['response_time']:.2f}s"]
         for r in results
     ]
     print("\nDetailed Results")
     print(tabulate(detailed_table, headers=["Model", "File", "Correct", "Response Time"], tablefmt="fancy_grid"))
+
+    # New table: prompts as columns, models as rows
+    prompts = sorted(list(set(r["file"] for r in results)))
+    models = sorted(list(set(r["model"] for r in results)))
+    
+    header = ["Model"] + prompts
+    table_data = []
+
+    for model in models:
+        row = [model]
+        for prompt in prompts:
+            found = False
+            for r in results:
+                if r["model"] == model and r["file"] == prompt:
+                    row.append("correct" if r["correct"] else "wrong")
+                    found = True
+                    break
+            if not found:
+                row.append("unavailable")
+        table_data.append(row)
+
+    print(tabulate(table_data, headers=header, tablefmt="fancy_grid"))
+
 
     # Summary table
     model_summary = {}
