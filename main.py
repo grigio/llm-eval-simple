@@ -250,7 +250,7 @@ def renderhtml(config: Config):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Model Evaluation Report</title>
+    <title>llm-eval-simple: Model Evaluation Report</title>
     <style>
         body { font-family: sans-serif; margin: 2em; background-color: #f4f4f9; color: #333; }
         h1, h2 { color: #444; }
@@ -322,7 +322,7 @@ def renderhtml(config: Config):
     </style>
 </head>
 <body>
-    <h1>Model Evaluation Report</h1>
+    <h1>llm-eval-simple: Model Evaluation Report</h1>
     
     <h2>Model Performance Summary</h2>
     <table>
