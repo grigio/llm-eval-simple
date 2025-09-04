@@ -1,5 +1,7 @@
 # LLM Eval Simple
 
+![screen](https://i.redd.it/nsuc0la2n4nf1.png)
+
 A simple tool for evaluating Large Language Models (LLMs) using a set of prompts and expected answers. It supports testing multiple models via an OpenAI-compatible API endpoint, measures response times, evaluates correctness (using an optional evaluator model or exact matching), and generates a summary report in tabular format.
 
 ```
