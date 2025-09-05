@@ -378,10 +378,14 @@ def renderhtml(config: Config):
         html += f"<tr><td>{model}</td>"
         for prompt in prompts:
             cell_style = ""
+            response_time_text = ""
             for r in results:
                 if r["model"] == model and r["file"] == prompt:
                     # Normalize response time to 0-1 (0 is fastest, 1 is slowest)
                     normalized_time = (r["response_time"] - min_time) / time_range
+                    
+                    # Add response time text centered in cell
+                    response_time_text = f'<div style="text-align: center; font-weight: bold; font-size: 0.9em;">{r["response_time"]:.2f}s</div>'
                     
                     if r["correct"]:
                         # For correct answers: interpolate from #00f700 (fast) to #f5fff5 (slow)
@@ -402,7 +406,7 @@ def renderhtml(config: Config):
                     break
             # Add click handler and data attribute to cells
             cell_id = f"{model}-{prompt}"
-            html += f'<td{cell_style} data-cell-id="{cell_id}" onclick="showOverlay(\'{cell_id}\')"></td>'
+            html += f'<td{cell_style} data-cell-id="{cell_id}" onclick="showOverlay(\'{cell_id}\')">{response_time_text}</td>'
         html += "</tr>"
     html += "</tbody></table>"
 
