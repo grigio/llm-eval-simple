@@ -104,7 +104,8 @@ def evaluate_correctness(config: Config, evaluator_model: str, expected_answer: 
 
 def get_prompt_files(pattern: str) -> List[str]:
     """Gets a sorted list of prompt files matching the pattern."""
-    return sorted(glob.glob(pattern))
+    files = glob.glob(pattern)
+    return sorted([f for f in files if os.path.isfile(f)])
 
 # --- Constants ---
 GENERATED_ANSWERS_DIR = "answers-generated"
