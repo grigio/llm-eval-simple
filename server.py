@@ -2,6 +2,7 @@ import http.server
 import socketserver
 import json
 import os
+from urllib.parse import urlparse, parse_qs
 
 PORT = 8000
 EVALUATED_REPORT_PATH = os.path.join("answers-generated", "report-evaluated.json")
@@ -10,8 +11,22 @@ TEMPLATE_PATH = "report_template.html"
 class ReportHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/':
+            self.send_response(301)
+            self.send_header('Location', '/?render=report-evaluated.json')
+            self.end_headers()
+            return
+
+        parsed_path = urlparse(self.path)
+        if parsed_path.path == '/':
+            query_components = parse_qs(parsed_path.query)
+            json_file = query_components.get("render", [None])[0]
+            if json_file:
+                json_path = os.path.join("answers-generated", json_file)
+            else:
+                json_path = EVALUATED_REPORT_PATH
+            
             try:
-                with open(EVALUATED_REPORT_PATH, 'r', encoding='utf-8') as f:
+                with open(json_path, 'r', encoding='utf-8') as f:
                     results = json.load(f)
                 
                 with open(TEMPLATE_PATH, 'r', encoding='utf-8') as f:
