@@ -7,6 +7,7 @@ A simple tool for evaluating Large Language Models (LLMs) using a set of prompts
 This script is useful for benchmarking LLM performance on custom datasets, such as accuracy on specific tasks or questions.
 
 ## Features
+
 - Batch testing of multiple models.
 - Automatic evaluation using an evaluator model or fallback to exact string matching.
 - Response time tracking.
@@ -14,38 +15,48 @@ This script is useful for benchmarking LLM performance on custom datasets, such 
 - Configurable via environment variables (e.g., model names, API endpoint).
 
 ## Prerequisites
+
 - Python 3.8+.
 - [uv](https://github.com/astral-sh/uv) installed for dependency management (a fast alternative to pip and venv).
 - Access to an OpenAI-compatible API endpoint (e.g., local server or hosted service) for model inference.
 - Directories for prompts and answers (created automatically if missing).
 
 ## Installation
+
 1. Clone the repository:
-   ```
+
+   ```bash
    git clone <repository-url>
    cd llm-eval-simple
    ```
 
 2. Install dependencies using uv:
-   ```
+
+   ```bash
    uv sync
    ```
+
    This will create a virtual environment and install all required packages from `pyproject.toml` or `requirements.txt`.
 
    If you prefer not to use uv, you can manually install dependencies:
-   ```
+
+   ```bash
    python -m venv .venv
    source .venv/bin/activate  # On Unix-based systems
    # or .venv\Scripts\activate on Windows
    pip install -r requirements.txt
    ```
+
    Note: The script assumes uv for running, but you can adapt it for standard Python.
 
 ## Configuration
+
 1. Create a `.env` file in the root directory based on `.env.example`:
-   ```
+
+   ```bash
    cp .env.example .env
    ```
+
    Edit `.env` with your settings:
    - `ENDPOINT_URL`: Your OpenAI-compatible API endpoint (default: `http://localhost:9292/v1/chat/completions`).
    - `API_KEY`: Your API key for authentication with the OpenAI-compatible API (optional).
@@ -59,12 +70,15 @@ This script is useful for benchmarking LLM performance on custom datasets, such 
    - Use consistent naming and ensure files are UTF-8 encoded.
 
 ## Usage
+
 Run the evaluation script:
-```
+
+```bash
 uv run python main.py
 # you can activate the actions separately and also the prompts
 uv run main.py --actions answer,evaluate,serve --pattern "prompts/REASON*"
 ```
+
 - This will process all prompt files, test each model, evaluate results, and print detailed per-file results followed by a summary table.
 - Output includes:
   - Per-model testing logs.
@@ -73,7 +87,7 @@ uv run main.py --actions answer,evaluate,serve --pattern "prompts/REASON*"
 
 Example output snippet:
 
-```
+```text
 ...
 ├────────────────────────────────┼───────────────────────────────┼───────────┼─────────────────┤
 │ gemma-3-27b-it-qat-q4_0-q3_k_m │ REASON-column-words.txt       │ 𐄂         │ 14.53s          │
@@ -110,6 +124,7 @@ Model Performance Summary
 ```
 
 ## Troubleshooting
+
 - **API Errors**: Ensure your endpoint is running and accessible. Check the URL and model names in `.env`.
 - **Evaluator Failures**: If using `MODEL_EVALUATOR`, it should return "CORRECT" or "INCORRECT". The script now handles variations like "not correct".
 - **No Matching Answers**: The script skips prompts without corresponding answer files.
@@ -117,7 +132,9 @@ Model Performance Summary
 - **Customization**: Modify `main.py` for advanced features, like adding more metrics or output formats.
 
 ## Contributing
+
 Feel free to open issues or pull requests for improvements.
 
 ## License
-MIT License. See `LICENSE` for details.
+
+MIT License. See [`LICENSE`](LICENSE) for details.
