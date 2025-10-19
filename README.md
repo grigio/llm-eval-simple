@@ -1,6 +1,6 @@
 # LLM Eval Simple
 
-![screen](https://private-user-images.githubusercontent.com/8074/496385074-e58be566-13c6-4b22-bcae-fa9faa07d828.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NTkzNTUyOTQsIm5iZiI6MTc1OTM1NDk5NCwicGF0aCI6Ii84MDc0LzQ5NjM4NTA3NC1lNThiZTU2Ni0xM2M2LTRiMjItYmNhZS1mYTlmYWEwN2Q4MjgucG5nP1gtQW16LUFsZ29yaXRobT1BV1M0LUhNQUMtU0hBMjU2JlgtQW16LUNyZWRlbnRpYWw9QUtJQVZDT0RZTFNBNTNQUUs0WkElMkYyMDI1MTAwMSUyRnVzLWVhc3QtMSUyRnMzJTJGYXdzNF9yZXF1ZXN0JlgtQW16LURhdGU9MjAyNTEwMDFUMjE0MzE0WiZYLUFtei1FeHBpcmVzPTMwMCZYLUFtei1TaWduYXR1cmU9NTM2YWUwODZkNGQyNGMxOGQ5ZjJlYzY4ZGU3YTBiNmZiZThiMGQ1MzZlOWFhMGUzYWIxM2QxMGZmNWE3OGM0OSZYLUFtei1TaWduZWRIZWFkZXJzPWhvc3QifQ.XHJY04iJcnpTGEHUUez6t3fGFnkJHTZm71lCSfwpq10)
+![benchmark report](./static/benchmark-report.png)
 
 A simple tool for evaluating Large Language Models (LLMs) using a set of prompts and expected answers. It supports testing multiple models via an OpenAI-compatible API endpoint, measures response times, evaluates correctness (using an optional evaluator model or exact matching), and generates a summary report in tabular format.
 
