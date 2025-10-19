@@ -4,7 +4,7 @@ import json
 import os
 from urllib.parse import urlparse, parse_qs
 
-PORT = 8000
+PORT = 8001
 EVALUATED_REPORT_PATH = os.path.join("answers-generated", "report-evaluated.json")
 TEMPLATE_PATH = "report_template.html"
 
