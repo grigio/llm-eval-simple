@@ -129,7 +129,7 @@
             }
         }
         
-        const cellData = __CELL_DATA__;
+        const cellData = JSON.parse(__CELL_DATA__);
         
         function showOverlay(cellId) {
             const data = cellData[cellId];
@@ -143,8 +143,9 @@
                 <p><strong>Status:</strong> ${data.correct ? 'Correct' : 'Incorrect'}</p>
                 <p><strong>Response Time:</strong> ${data.response_time}s</p>
                 <h4>Generated Answer:</h4>
-                <pre>${data.generated}</pre>
+                <pre></pre>
             `;
+            overlayData.querySelector('pre').textContent = data.generated;
             
             overlay.style.display = 'flex';
         }

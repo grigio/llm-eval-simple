@@ -162,20 +162,19 @@ class ReportHandler(http.server.SimpleHTTPRequestHandler):
     """
 
         # Cell data for JavaScript
-        cell_data = ""
+        cell_data_dict = {}
         for r in results:
             cell_id = f"{r['model']}-{r['file']}"
-            escaped_answer = r['generated'].replace('"', '\\"').replace('\n', '\\n')
-            cell_data += f'''
-                "{cell_id}": {{
-                    "model": "{r["model"]}",
-                    "file": "{r["file"]}",
-                    "generated": "{escaped_answer}",
-                    "response_time": {r["response_time"]:.2f},
-                    "correct": {str(r["correct"]).lower()}
-                }},'''
-        
-        return summary_table, detailed_results_header, detailed_results_body, questions_details, f"{{{cell_data.strip(',')}}}"
+            cell_data_dict[cell_id] = {
+                "model": r["model"],
+                "file": r["file"],
+                "generated": r["generated"],
+                "response_time": f"{r['response_time']:.2f}",
+                "correct": r["correct"]
+            }
+        cell_data = json.dumps(json.dumps(cell_data_dict))
+
+        return summary_table, detailed_results_header, detailed_results_body, questions_details, cell_data
 
 with socketserver.TCPServer(("", PORT), ReportHandler) as httpd:
     print("serving at port", PORT)
