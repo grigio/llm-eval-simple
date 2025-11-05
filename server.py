@@ -97,28 +97,61 @@ class ReportHandler(http.server.SimpleHTTPRequestHandler):
         for prompt in prompts:
             detailed_results_header += f"<th>{prompt}</th>"
 
+        # Find fastest correct test for each prompt file
+        fastest_correct_per_prompt = {}
+        for prompt in prompts:
+            fastest_time = float('inf')
+            fastest_model = None
+            for r in results:
+                if r["file"] == prompt and r["correct"] and r["response_time"] < fastest_time:
+                    fastest_time = r["response_time"]
+                    fastest_model = r["model"]
+            if fastest_model:
+                fastest_correct_per_prompt[prompt] = fastest_model
+
         detailed_results_body = ""
         for model in models:
             detailed_results_body += f"<tr><td>{model}</td>"
             for prompt in prompts:
                 cell_style = ""
                 response_time_text = ""
+                is_fastest_correct = False
+                
                 for r in results:
                     if r["model"] == model and r["file"] == prompt:
                         normalized_time = (r["response_time"] - min_time) / time_range
                         response_time_text = f'<div style="text-align: center; font-weight: bold; font-size: 0.9em;">{r["response_time"]:.2f}s</div>'
                         
+                        # Check if this is the fastest correct test for this prompt
+                        is_fastest_correct = (r["correct"] and 
+                                            prompt in fastest_correct_per_prompt and 
+                                            fastest_correct_per_prompt[prompt] == model)
+                        
                         if r["correct"]:
-                            r_fast, g_fast, b_fast = 0, 247, 0
-                            r_slow, g_slow, b_slow = 245, 255, 245
-                            r_val = int(r_fast + (r_slow - r_fast) * normalized_time)
-                            g_val = int(g_fast + (g_slow - g_fast) * normalized_time)
-                            b_val = int(b_fast + (b_slow - b_fast) * normalized_time)
-                            cell_style = f' style="background-color: rgb({r_val}, {g_val}, {b_val});"'
+                            if is_fastest_correct:
+                                # Highlight fastest correct with gold/yellow
+                                r_fast, g_fast, b_fast = 255, 215, 0  # Gold color
+                                r_slow, g_slow, b_slow = 0, 247, 0  # Green
+                                r_val = int(r_fast + (r_slow - r_fast) * normalized_time)
+                                g_val = int(g_fast + (g_slow - g_fast) * normalized_time)
+                                b_val = int(b_fast + (b_slow - b_fast) * normalized_time)
+                                cell_style = f' style="background-color: rgb({r_val}, {g_val}, {b_val}); border: 2px solid #FFD700; box-shadow: 0 0 5px rgba(255, 215, 0, 0.5);"'
+                            else:
+                                # Regular correct answers
+                                r_fast, g_fast, b_fast = 0, 247, 0
+                                r_slow, g_slow, b_slow = 245, 255, 245
+                                r_val = int(r_fast + (r_slow - r_fast) * normalized_time)
+                                g_val = int(g_fast + (g_slow - g_fast) * normalized_time)
+                                b_val = int(b_fast + (b_slow - b_fast) * normalized_time)
+                                cell_style = f' style="background-color: rgb({r_val}, {g_val}, {b_val});"'
                         else:
                             lightness = int(70 + 30 * normalized_time)
                             cell_style = f' style="background-color: hsl(0, 100%, {lightness}%);"'
                         break
+                        
+                if is_fastest_correct:
+                    response_time_text = '<div style="text-align: center; font-weight: bold; font-size: 0.9em;">⭐ ' + response_time_text.split('>')[1] if '>' in response_time_text else response_time_text
+                    
                 cell_id = f"{model}-{prompt}"
                 detailed_results_body += f'<td{cell_style} data-cell-id="{cell_id}" onclick="showOverlay(\'{cell_id}\')">{response_time_text}</td>'
             detailed_results_body += "</tr>"
