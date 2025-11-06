@@ -20,3 +20,4 @@
 - **File Encoding**: Always use UTF-8 encoding for file operations
 - **Constants**: Define file paths and constants at module level in UPPER_CASE
 - **Virtual Environment**: `uv` automatically manages a virtual environment. There's no need to manually create or activate one with `python -m venv` or `source venv/bin/activate`. Use `uv sync` to install dependencies from the `pyproject.toml` and `uv.lock` files, creating or updating the virtual environment as needed.
+- **Python via uv**: Always use `uv run python` to execute Python commands. Example: `uv run python --version` returns Python 3.13.1
