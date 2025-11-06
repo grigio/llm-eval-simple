@@ -71,12 +71,35 @@ This script is useful for benchmarking LLM performance on custom datasets, such 
 
 ## Usage
 
+### Running Evaluations
+
 Run the evaluation script:
 
 ```bash
 uv run python main.py
 # you can activate the actions separately and also the prompts
 uv run main.py --actions answer,evaluate,serve --pattern "prompts/REASON*"
+```
+
+### Starting the Dashboard
+
+For a web-based dashboard to view results, use the `start-dashboard.sh` script:
+
+```bash
+./start-dashboard.sh
+```
+
+This will start:
+- API server on port 4000
+- Web UI on port 3000
+
+Alternatively, start components manually:
+```bash
+# Start API server
+uv run python api_server.py
+
+# Start web UI (in another terminal)
+cd frontend && npm run dev
 ```
 
 - This will process all prompt files, test each model, evaluate results, and print detailed per-file results followed by a summary table.

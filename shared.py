@@ -9,7 +9,7 @@ EVALUATED_REPORT_PATH = os.path.join(GENERATED_ANSWERS_DIR, "report-evaluated.js
 HTML_REPORT_PATH = os.path.join(GENERATED_ANSWERS_DIR, "report-evaluated.html")
 
 # Server constants
-DEFAULT_SERVER_PORT = 8001
+DEFAULT_SERVER_PORT = 4000
 TEMPLATE_PATH = "report_template.html"
 
 # Color constants for HTML output

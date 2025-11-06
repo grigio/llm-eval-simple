@@ -185,6 +185,7 @@ class ReportHandler(http.server.SimpleHTTPRequestHandler):
 
         return summary_table, detailed_results_header, detailed_results_body, questions_details, cell_data
 
-with socketserver.TCPServer(("", SERVER_PORT), ReportHandler) as httpd:
-    print("serving at port", SERVER_PORT)
-    httpd.serve_forever()
+if __name__ == "__main__":
+    with socketserver.TCPServer(("", SERVER_PORT), ReportHandler) as httpd:
+        print("serving at port", SERVER_PORT)
+        httpd.serve_forever()
