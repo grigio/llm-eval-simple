@@ -1,45 +1,42 @@
 import argparse
-import glob
-import json
 import os
 import time
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
 import re
 
-import requests
 from dotenv import load_dotenv
-from tabulate import tabulate
 
-from shared import (
-    ACCURACY_DECIMAL_PLACES,
-    DEFAULT_PROGRESS_BAR_LENGTH,
-    EVALUATED_REPORT_PATH,
-    GENERATED_ANSWERS_DIR,
-    HTML_REPORT_PATH,
-    RAW_REPORT_PATH,
-    RESPONSE_TIME_DECIMAL_PLACES,
-    calculate_model_summary,
-    create_progress_bar,
-    format_accuracy,
-    format_response_time,
-    get_unique_prompts_and_models
-)
+from shared import GENERATED_ANSWERS_DIR, EVALUATED_REPORT_PATH, RAW_REPORT_PATH
+from api_client import get_model_response, evaluate_correctness
+from file_utils import get_prompt_files, read_file_content, save_raw_results, load_raw_results, save_evaluated_results, load_evaluated_results, ensure_directory_exists
+from reporting import format_detailed_table, format_matrix_table, format_summary_table
+
+# --- Constants ---
+
+# Default configuration values
+DEFAULT_PROMPT_DIR = "prompts"
+DEFAULT_ANSWER_DIR = "answers"
+DEFAULT_ENDPOINT_URL = "http://localhost:9292/v1/chat/completions"
+DEFAULT_MODEL_EVALUATOR = "some-quite-powerful-model-8B"
+DEFAULT_PATTERN = "*"
+DEFAULT_ACTIONS = ["answer", "evaluate", "render", "serve"]
+DEFAULT_THROTTLING_SECS = 0.1
 
 # --- Configuration ---
 
 @dataclass
 class Config:
     """Holds the configuration for the evaluation script."""
-    prompt_dir: str = "prompts"
-    answer_dir: str = "answers"
-    endpoint_url: str = "http://localhost:9292/v1/chat/completions"
+    prompt_dir: str = DEFAULT_PROMPT_DIR
+    answer_dir: str = DEFAULT_ANSWER_DIR
+    endpoint_url: str = DEFAULT_ENDPOINT_URL
     model_names: List[str] = field(default_factory=list)
-    model_evaluator: str = "some-quite-powerful-model-8B"
-    pattern: str = "*"
+    model_evaluator: str = DEFAULT_MODEL_EVALUATOR
+    pattern: str = DEFAULT_PATTERN
     actions: List[str] = field(default_factory=list)
     api_key: str = None
-    throttling_secs: float = 0.1
+    throttling_secs: float = DEFAULT_THROTTLING_SECS
     
     def validate(self) -> List[str]:
         """Validate configuration and return list of errors."""
@@ -101,15 +98,15 @@ def load_config() -> Config:
     model_names = [name.strip() for name in model_names_str.split(",") if name.strip()]
 
     config = Config(
-        prompt_dir="prompts",
-        answer_dir="answers",
-        endpoint_url=os.getenv("ENDPOINT_URL", "http://localhost:9292/v1/chat/completions"),
+        prompt_dir=DEFAULT_PROMPT_DIR,
+        answer_dir=DEFAULT_ANSWER_DIR,
+        endpoint_url=os.getenv("ENDPOINT_URL", DEFAULT_ENDPOINT_URL),
         model_names=model_names,
-        model_evaluator=os.getenv("MODEL_EVALUATOR", "some-quite-powerful-model-8B"),
+        model_evaluator=os.getenv("MODEL_EVALUATOR", DEFAULT_MODEL_EVALUATOR),
         pattern=args.pattern,
         actions=[action.strip() for action in args.actions.split(',')],
         api_key=os.getenv("API_KEY"),
-        throttling_secs=float(os.getenv("THROTTLING_SECS", 0.1))
+        throttling_secs=float(os.getenv("THROTTLING_SECS", str(DEFAULT_THROTTLING_SECS)))
     )
     
     # Validate configuration
@@ -122,66 +119,7 @@ def load_config() -> Config:
     
     return config
 
-# --- API Interaction ---
-
-def get_model_response(config: Config, model: str, prompt: str, system_prompt: str = None) -> Dict[str, Any]:
-    """Gets a response from the specified model."""
-    time.sleep(config.throttling_secs)
-    messages = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
-    messages.append({"role": "user", "content": prompt})
-    
-    payload = {
-        "model": model,
-        "messages": messages,
-        "stream": False
-    }
-    headers = {"Content-Type": "application/json"}
-    
-    if config.api_key:
-        headers["Authorization"] = f"Bearer {config.api_key}"
-    
-    response = requests.post(config.endpoint_url, json=payload, headers=headers)
-    response.raise_for_status()
-    return response.json()
-
-# --- Evaluation ---
-
-def evaluate_correctness(config: Config, evaluator_model: str, expected_answer: str, generated_answer: str) -> bool:
-    """Evaluates the correctness of a generated answer using an evaluator model."""
-    if not evaluator_model:
-        return generated_answer.lower() == expected_answer.lower()
-
-    system_prompt = "You are an evaluator. Compare the expected answer with the generated answer. Ignore the tag  content. The generated answers may vary slightly in wording but should preserve the original meaning. If the answers are equivalent in meaning, mark as correct. Respond with only 'CORRECT' or 'INCORRECT'."
-    user_prompt = f"Expected Answer: {expected_answer}\nGenerated Answer: {generated_answer}"
-    
-    try:
-        eval_response = get_model_response(config, evaluator_model, user_prompt, system_prompt)
-        eval_result = eval_response.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
-        
-        # NOTE: keep this to debug evaluator model
-        # print(eval_result)
-
-        # More flexible evaluation - look for clear indicators of correctness
-        if "CORRECT" == eval_result:
-            return True
-        if "INCORRECT" == eval_result:
-            return False
-
-        return False
-    except requests.exceptions.RequestException as e:
-        print(f"Evaluator error: {str(e)}")
-        return False
-
-# --- File Handling ---
-
-def get_prompt_files(pattern: str) -> List[str]:
-    """Gets a sorted list of prompt files matching the pattern."""
-    files = glob.glob(pattern)
-    return sorted([f for f in files if os.path.isfile(f)])
-
-# --- Constants ---
+# --- Action Functions ---
 
 
 # --- Action Functions ---
@@ -195,14 +133,12 @@ def answer_prompt(prompt_path: str, model_name: str, config: Config) -> Dict[str
         print(f"Skipping {base_name}: No matching answer file found.")
         return None
 
-    with open(prompt_path, 'r', encoding='utf-8') as f:
-        prompt = f.read().strip()
-    with open(answer_path, 'r', encoding='utf-8') as f:
-        expected_answer = f.read().strip()
+    prompt = read_file_content(prompt_path)
+    expected_answer = read_file_content(answer_path)
 
     start_time = time.time()
     try:
-        response_json = get_model_response(config, model_name, prompt)
+        response_json = get_model_response(config.endpoint_url, model_name, prompt, config.api_key, throttling_secs=config.throttling_secs)
         end_time = time.time()
         
         generated_answer = response_json.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
@@ -219,7 +155,7 @@ def answer_prompt(prompt_path: str, model_name: str, config: Config) -> Dict[str
         print(f"Answered: {base_name} with {model_name}")
         return result
 
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
         print(f"Error for {base_name} with {model_name}: {str(e)}")
         return None
 
@@ -236,17 +172,14 @@ def answer(config: Config):
             if result:
                 results.append(result)
     
-    with open(RAW_REPORT_PATH, 'w', encoding='utf-8') as f:
-        json.dump(results, f, indent=2)
-    
+    save_raw_results(results)
     print(f"\nGenerated {len(results)} answers. Report saved to {RAW_REPORT_PATH}")
 
 def evaluate(config: Config):
     """Evaluates the generated answers."""
     print("\n--- Starting Evaluation ---")
     try:
-        with open(RAW_REPORT_PATH, 'r', encoding='utf-8') as f:
-            results = json.load(f)
+        results = load_raw_results()
     except FileNotFoundError:
         print(f"Error: {RAW_REPORT_PATH} not found. Please run the 'answer' action first.")
         return
@@ -254,27 +187,26 @@ def evaluate(config: Config):
     evaluated_results = []
     for result in results:
         is_correct = evaluate_correctness(
-            config,
+            config.endpoint_url,
             config.model_evaluator, 
             result["expected"], 
-            result["generated"]
+            result["generated"],
+            config.api_key,
+            config.throttling_secs
         )
         result["correct"] = is_correct
         result["evaluator_model"] = config.model_evaluator
         evaluated_results.append(result)
         print(f"Evaluated: {result['file']} for {result['model']} -> {'Correct' if is_correct else 'Incorrect'}")
 
-    with open(EVALUATED_REPORT_PATH, 'w', encoding='utf-8') as f:
-        json.dump(evaluated_results, f, indent=2)
-
+    save_evaluated_results(evaluated_results)
     print(f"\nEvaluation complete. Report saved to {EVALUATED_REPORT_PATH}")
 
 def render(config: Config):
     """Renders the final report."""
     print("\n--- Rendering Report ---")
     try:
-        with open(EVALUATED_REPORT_PATH, 'r', encoding='utf-8') as f:
-            results = json.load(f)
+        results = load_evaluated_results()
     except FileNotFoundError:
         print(f"Error: {EVALUATED_REPORT_PATH} not found. Please run the 'evaluate' action first.")
         return
@@ -297,63 +229,23 @@ def print_summary(results: List[Dict[str, Any]]):
         return
 
     # Detailed table
-    detailed_table = [
-        [r["model"], r["file"], "correct" if r["correct"] else "wrong", format_response_time(r["response_time"])]
-        for r in results
-    ]
     print("\nDetailed Results")
-    print(tabulate(detailed_table, headers=["Model", "File", "Correct", "Response Time"], tablefmt="fancy_grid"))
+    print(format_detailed_table(results))
 
-    # New table: prompts as columns, models as rows
-    prompts, models = get_unique_prompts_and_models(results)
-    
-    header = ["Model"] + prompts
-    table_data = []
-
-    for model in models:
-        row = [model]
-        for prompt in prompts:
-            found = False
-            for r in results:
-                if r["model"] == model and r["file"] == prompt:
-                    row.append("correct" if r["correct"] else "wrong")
-                    found = True
-                    break
-            if not found:
-                row.append("unavailable")
-        table_data.append(row)
-
-    print(tabulate(table_data, headers=header, tablefmt="fancy_grid"))
+    # Matrix table: prompts as columns, models as rows
+    print("\nMatrix Results")
+    print(format_matrix_table(results))
 
     # Summary table
-    model_summary = calculate_model_summary(results)
-
-    summary_table = []
-    for model, stats in model_summary.items():
-        total = stats["total"]
-        correct = stats["correct"]
-        total_time = stats["total_time"]
-        
-        accuracy = (correct / total) * 100 if total > 0 else 0
-        avg_time = total_time / total if total > 0 else 0
-        
-        bar = create_progress_bar(accuracy)
-        
-        summary_table.append([
-            model,
-            f"{correct}/{total} ({format_accuracy(correct, total)}) [{bar}]",
-            format_response_time(avg_time)
-        ])
-
     print("\nModel Performance Summary")
-    print(tabulate(summary_table, headers=["Model", "Correct", "Avg Response Time"], tablefmt="fancy_grid"))
+    print(format_summary_table(results))
 
 # --- Main Execution ---
 
 def main():
     """Main function to run the model evaluation."""
     config = load_config()
-    os.makedirs(GENERATED_ANSWERS_DIR, exist_ok=True)
+    ensure_directory_exists(GENERATED_ANSWERS_DIR)
 
     if "answer" in config.actions:
         answer(config)
