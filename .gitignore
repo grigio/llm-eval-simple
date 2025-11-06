@@ -12,3 +12,19 @@ wheels/
 prompts/*
 answers/*
 answers-generated/*
+
+# Node.js dependencies and build files
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
