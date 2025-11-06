@@ -1,13 +1,30 @@
-import os
-import glob
-import time
-import requests
-import json
 import argparse
+import glob
+import json
+import os
+import time
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
-from tabulate import tabulate
+import re
+
+import requests
 from dotenv import load_dotenv
+from tabulate import tabulate
+
+from shared import (
+    ACCURACY_DECIMAL_PLACES,
+    DEFAULT_PROGRESS_BAR_LENGTH,
+    EVALUATED_REPORT_PATH,
+    GENERATED_ANSWERS_DIR,
+    HTML_REPORT_PATH,
+    RAW_REPORT_PATH,
+    RESPONSE_TIME_DECIMAL_PLACES,
+    calculate_model_summary,
+    create_progress_bar,
+    format_accuracy,
+    format_response_time,
+    get_unique_prompts_and_models
+)
 
 # --- Configuration ---
 
@@ -23,6 +40,53 @@ class Config:
     actions: List[str] = field(default_factory=list)
     api_key: str = None
     throttling_secs: float = 0.1
+    
+    def validate(self) -> List[str]:
+        """Validate configuration and return list of errors."""
+        errors = []
+        
+        # Validate endpoint URL
+        if not self.endpoint_url:
+            errors.append("endpoint_url cannot be empty")
+        elif not re.match(r'^https?://', self.endpoint_url):
+            errors.append("endpoint_url must start with http:// or https://")
+        
+        # Validate model names
+        if not self.model_names:
+            errors.append("model_names cannot be empty")
+        else:
+            for model_name in self.model_names:
+                if not model_name or not model_name.strip():
+                    errors.append("model names cannot be empty strings")
+        
+        # Validate model evaluator
+        if not self.model_evaluator or not self.model_evaluator.strip():
+            errors.append("model_evaluator cannot be empty")
+        
+        # Validate actions
+        valid_actions = {"answer", "evaluate", "render", "serve"}
+        if not self.actions:
+            errors.append("actions cannot be empty")
+        else:
+            for action in self.actions:
+                if action not in valid_actions:
+                    errors.append(f"Invalid action '{action}'. Valid actions: {', '.join(valid_actions)}")
+        
+        # Validate throttling
+        if self.throttling_secs < 0:
+            errors.append("throttling_secs must be non-negative")
+        
+        # Validate directories
+        if not self.prompt_dir:
+            errors.append("prompt_dir cannot be empty")
+        if not self.answer_dir:
+            errors.append("answer_dir cannot be empty")
+        
+        # Validate pattern
+        if not self.pattern:
+            errors.append("pattern cannot be empty")
+        
+        return errors
 
 def load_config() -> Config:
     """Loads configuration from environment variables and command-line arguments."""
@@ -36,7 +100,7 @@ def load_config() -> Config:
     model_names_str = os.getenv("MODEL_NAMES", "gemma-3-270m-it-Q4_K_M,Qwen3-8B-Q4_K_M")
     model_names = [name.strip() for name in model_names_str.split(",") if name.strip()]
 
-    return Config(
+    config = Config(
         prompt_dir="prompts",
         answer_dir="answers",
         endpoint_url=os.getenv("ENDPOINT_URL", "http://localhost:9292/v1/chat/completions"),
@@ -47,6 +111,16 @@ def load_config() -> Config:
         api_key=os.getenv("API_KEY"),
         throttling_secs=float(os.getenv("THROTTLING_SECS", 0.1))
     )
+    
+    # Validate configuration
+    errors = config.validate()
+    if errors:
+        print("Configuration validation errors:")
+        for error in errors:
+            print(f"  - {error}")
+        exit(1)
+    
+    return config
 
 # --- API Interaction ---
 
@@ -108,10 +182,6 @@ def get_prompt_files(pattern: str) -> List[str]:
     return sorted([f for f in files if os.path.isfile(f)])
 
 # --- Constants ---
-GENERATED_ANSWERS_DIR = "answers-generated"
-RAW_REPORT_PATH = os.path.join(GENERATED_ANSWERS_DIR, "report.json")
-EVALUATED_REPORT_PATH = os.path.join(GENERATED_ANSWERS_DIR, "report-evaluated.json")
-HTML_REPORT_PATH = os.path.join(GENERATED_ANSWERS_DIR, "report-evaluated.html")
 
 
 # --- Action Functions ---
@@ -228,15 +298,14 @@ def print_summary(results: List[Dict[str, Any]]):
 
     # Detailed table
     detailed_table = [
-        [r["model"], r["file"], "correct" if r["correct"] else "wrong", f"{r['response_time']:.2f}s"]
+        [r["model"], r["file"], "correct" if r["correct"] else "wrong", format_response_time(r["response_time"])]
         for r in results
     ]
     print("\nDetailed Results")
     print(tabulate(detailed_table, headers=["Model", "File", "Correct", "Response Time"], tablefmt="fancy_grid"))
 
     # New table: prompts as columns, models as rows
-    prompts = sorted(list(set(r["file"] for r in results)))
-    models = sorted(list(set(r["model"] for r in results)))
+    prompts, models = get_unique_prompts_and_models(results)
     
     header = ["Model"] + prompts
     table_data = []
@@ -256,18 +325,8 @@ def print_summary(results: List[Dict[str, Any]]):
 
     print(tabulate(table_data, headers=header, tablefmt="fancy_grid"))
 
-
     # Summary table
-    model_summary = {}
-    for r in results:
-        model = r["model"]
-        if model not in model_summary:
-            model_summary[model] = {"total": 0, "correct": 0, "total_time": 0}
-        
-        model_summary[model]["total"] += 1
-        if r["correct"]:
-            model_summary[model]["correct"] += 1
-        model_summary[model]["total_time"] += r["response_time"]
+    model_summary = calculate_model_summary(results)
 
     summary_table = []
     for model, stats in model_summary.items():
@@ -278,13 +337,12 @@ def print_summary(results: List[Dict[str, Any]]):
         accuracy = (correct / total) * 100 if total > 0 else 0
         avg_time = total_time / total if total > 0 else 0
         
-        bar_length = int(accuracy / 10)
-        bar = "█" * bar_length + "░" * (10 - bar_length)
+        bar = create_progress_bar(accuracy)
         
         summary_table.append([
             model,
-            f"{correct}/{total} ({accuracy:.1f}%) [{bar}]",
-            f"{avg_time:.2f}s"
+            f"{correct}/{total} ({format_accuracy(correct, total)}) [{bar}]",
+            format_response_time(avg_time)
         ])
 
     print("\nModel Performance Summary")

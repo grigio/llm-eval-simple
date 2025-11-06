@@ -1,12 +1,31 @@
 import http.server
-import socketserver
 import json
 import os
-from urllib.parse import urlparse, parse_qs
+import socketserver
+from urllib.parse import parse_qs, urlparse
 
-PORT = 8001
-EVALUATED_REPORT_PATH = os.path.join("answers-generated", "report-evaluated.json")
-TEMPLATE_PATH = "report_template.html"
+from shared import (
+    DEFAULT_SERVER_PORT,
+    EVALUATED_REPORT_PATH,
+    TEMPLATE_PATH,
+    GOLD_RGB,
+    GREEN_RGB,
+    HSL_LIGHTNESS_MIN,
+    HSL_LIGHTNESS_RANGE,
+    LIGHT_GREEN_RGB,
+    RGB_MAX,
+    calculate_model_summary,
+    create_cell_data_dict,
+    find_fastest_correct_per_prompt,
+    format_accuracy,
+    format_response_time,
+    get_unique_prompts_and_models,
+    group_results_by_file,
+    interpolate_color,
+    normalize_time_value
+)
+
+SERVER_PORT = DEFAULT_SERVER_PORT
 
 class ReportHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -52,17 +71,8 @@ class ReportHandler(http.server.SimpleHTTPRequestHandler):
             super().do_GET()
 
     def format_results(self, results):
-        # Calculate summary
-        model_summary = {}
-        for r in results:
-            model = r["model"]
-            if model not in model_summary:
-                model_summary[model] = {"total": 0, "correct": 0, "total_time": 0}
-            
-            model_summary[model]["total"] += 1
-            if r["correct"]:
-                model_summary[model]["correct"] += 1
-            model_summary[model]["total_time"] += r["response_time"]
+        # Calculate summary using shared function
+        model_summary = calculate_model_summary(results)
 
         summary_table = ""
         for model, stats in model_summary.items():
@@ -97,17 +107,8 @@ class ReportHandler(http.server.SimpleHTTPRequestHandler):
         for prompt in prompts:
             detailed_results_header += f"<th>{prompt}</th>"
 
-        # Find fastest correct test for each prompt file
-        fastest_correct_per_prompt = {}
-        for prompt in prompts:
-            fastest_time = float('inf')
-            fastest_model = None
-            for r in results:
-                if r["file"] == prompt and r["correct"] and r["response_time"] < fastest_time:
-                    fastest_time = r["response_time"]
-                    fastest_model = r["model"]
-            if fastest_model:
-                fastest_correct_per_prompt[prompt] = fastest_model
+        # Find fastest correct test for each prompt file using shared function
+        fastest_correct_per_prompt = find_fastest_correct_per_prompt(results, prompts)
 
         detailed_results_body = ""
         for model in models:
@@ -130,22 +131,14 @@ class ReportHandler(http.server.SimpleHTTPRequestHandler):
                         if r["correct"]:
                             if is_fastest_correct:
                                 # Highlight fastest correct with gold/yellow
-                                r_fast, g_fast, b_fast = 255, 215, 0  # Gold color
-                                r_slow, g_slow, b_slow = 0, 247, 0  # Green
-                                r_val = int(r_fast + (r_slow - r_fast) * normalized_time)
-                                g_val = int(g_fast + (g_slow - g_fast) * normalized_time)
-                                b_val = int(b_fast + (b_slow - b_fast) * normalized_time)
+                                r_val, g_val, b_val = interpolate_color(GOLD_RGB, GREEN_RGB, normalized_time)
                                 cell_style = f' style="background-color: rgb({r_val}, {g_val}, {b_val}); border: 2px solid #FFD700; box-shadow: 0 0 5px rgba(255, 215, 0, 0.5);"'
                             else:
                                 # Regular correct answers
-                                r_fast, g_fast, b_fast = 0, 247, 0
-                                r_slow, g_slow, b_slow = 245, 255, 245
-                                r_val = int(r_fast + (r_slow - r_fast) * normalized_time)
-                                g_val = int(g_fast + (g_slow - g_fast) * normalized_time)
-                                b_val = int(b_fast + (b_slow - b_fast) * normalized_time)
+                                r_val, g_val, b_val = interpolate_color(GREEN_RGB, LIGHT_GREEN_RGB, normalized_time)
                                 cell_style = f' style="background-color: rgb({r_val}, {g_val}, {b_val});"'
                         else:
-                            lightness = int(70 + 30 * normalized_time)
+                            lightness = int(HSL_LIGHTNESS_MIN + HSL_LIGHTNESS_RANGE * normalized_time)
                             cell_style = f' style="background-color: hsl(0, 100%, {lightness}%);"'
                         break
                         
@@ -156,16 +149,8 @@ class ReportHandler(http.server.SimpleHTTPRequestHandler):
                 detailed_results_body += f'<td{cell_style} data-cell-id="{cell_id}" onclick="showOverlay(\'{cell_id}\')">{response_time_text}</td>'
             detailed_results_body += "</tr>"
 
-        # Questions details
-        results_by_file = {}
-        for r in results:
-            if r['file'] not in results_by_file:
-                results_by_file[r['file']] = {
-                    "prompt": r['prompt'],
-                    "expected": r['expected'],
-                    "models": []
-                }
-            results_by_file[r['file']]['models'].append(r)
+        # Questions details using shared function
+        results_by_file = group_results_by_file(results)
 
         questions_details = ""
         for file, data in results_by_file.items():
@@ -194,21 +179,12 @@ class ReportHandler(http.server.SimpleHTTPRequestHandler):
             </div>
     """
 
-        # Cell data for JavaScript
-        cell_data_dict = {}
-        for r in results:
-            cell_id = f"{r['model']}-{r['file']}"
-            cell_data_dict[cell_id] = {
-                "model": r["model"],
-                "file": r["file"],
-                "generated": r["generated"],
-                "response_time": f"{r['response_time']:.2f}",
-                "correct": r["correct"]
-            }
+        # Cell data for JavaScript using shared function
+        cell_data_dict = create_cell_data_dict(results)
         cell_data = json.dumps(json.dumps(cell_data_dict))
 
         return summary_table, detailed_results_header, detailed_results_body, questions_details, cell_data
 
-with socketserver.TCPServer(("", PORT), ReportHandler) as httpd:
-    print("serving at port", PORT)
+with socketserver.TCPServer(("", SERVER_PORT), ReportHandler) as httpd:
+    print("serving at port", SERVER_PORT)
     httpd.serve_forever()
