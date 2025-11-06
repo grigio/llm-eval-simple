@@ -23,12 +23,8 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         # API endpoint for results
         if parsed_path.path == '/api/results':
             self.handle_api_request()
-        # Serve static files and frontend
-        elif parsed_path.path == '/' or parsed_path.path.startswith('/static'):
-            self.serve_frontend()
         else:
-            # Try to serve frontend files (for React app)
-            self.serve_frontend_file()
+            self.send_error(404, "API endpoint not found. Use /api/results for evaluation data.")
     
     def handle_api_request(self):
         """Handle API requests for evaluation results."""
@@ -113,101 +109,21 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         """Prepare detailed question data for API response."""
         return group_results_by_file(results)
     
-    def serve_frontend(self):
-        """Serve the React frontend."""
-        # For development, serve the React app
-        # In production, this would serve built static files
-        frontend_path = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist')
-        
-        if self.path == '/':
-            file_path = os.path.join(frontend_path, 'index.html')
-        else:
-            # Remove query parameters and serve static files
-            clean_path = self.path.split('?')[0]
-            file_path = os.path.join(frontend_path, clean_path.lstrip('/'))
-        
-        try:
-            with open(file_path, 'rb') as f:
-                content = f.read()
-            
-            self.send_response(200)
-            
-            # Set appropriate content type
-            if file_path.endswith('.html'):
-                self.send_header('Content-type', 'text/html')
-            elif file_path.endswith('.css'):
-                self.send_header('Content-type', 'text/css')
-            elif file_path.endswith('.js'):
-                self.send_header('Content-type', 'application/javascript')
-            elif file_path.endswith('.json'):
-                self.send_header('Content-type', 'application/json')
-            else:
-                self.send_header('Content-type', 'application/octet-stream')
-            
-            self.end_headers()
-            self.wfile.write(content)
-            
-        except FileNotFoundError:
-            # Fallback to index.html for SPA routing
-            if self.path != '/':
-                self.path = '/'
-                self.serve_frontend()
-            else:
-                self.send_error(404, "File not found")
     
-    def serve_frontend_file(self):
-        """Serve individual frontend files."""
-        frontend_path = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist')
-        file_path = os.path.join(frontend_path, self.path.lstrip('/'))
-        
-        try:
-            with open(file_path, 'rb') as f:
-                content = f.read()
-            
-            self.send_response(200)
-            
-            # Set appropriate content type
-            if file_path.endswith('.html'):
-                self.send_header('Content-type', 'text/html')
-            elif file_path.endswith('.css'):
-                self.send_header('Content-type', 'text/css')
-            elif file_path.endswith('.js'):
-                self.send_header('Content-type', 'application/javascript')
-            elif file_path.endswith('.json'):
-                self.send_header('Content-type', 'application/json')
-            elif file_path.endswith('.ico'):
-                self.send_header('Content-type', 'image/x-icon')
-            elif file_path.endswith('.png'):
-                self.send_header('Content-type', 'image/png')
-            else:
-                self.send_header('Content-type', 'application/octet-stream')
-            
-            self.end_headers()
-            self.wfile.write(content)
-            
-        except FileNotFoundError:
-            # Fallback to index.html for SPA routing
-            index_path = os.path.join(frontend_path, 'index.html')
-            try:
-                with open(index_path, 'rb') as f:
-                    content = f.read()
-                
-                self.send_response(200)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
-                self.wfile.write(content)
-            except FileNotFoundError:
-                self.send_error(404, "Frontend not built. Run 'npm run build' in frontend directory.")
 
 def run_server():
-    """Run the enhanced server with API endpoints."""
+    """Run the API server."""
     import socketserver
+    import socket
     
-    print(f"Starting enhanced server at http://localhost:{SERVER_PORT}")
-    print("API endpoint available at: http://localhost:{SERVER_PORT}/api/results")
-    print("Frontend available at: http://localhost:{SERVER_PORT}/")
+    print(f"🔌 Starting API server at http://localhost:{SERVER_PORT}")
+    print(f"📊 API endpoint available at: http://localhost:{SERVER_PORT}/api/results")
     
-    with socketserver.TCPServer(("", SERVER_PORT), APIHandler) as httpd:
+    # Create server with socket reuse to handle TIME_WAIT state
+    class ReusableTCPServer(socketserver.TCPServer):
+        allow_reuse_address = True
+    
+    with ReusableTCPServer(("", SERVER_PORT), APIHandler) as httpd:
         httpd.serve_forever()
 
 if __name__ == "__main__":
