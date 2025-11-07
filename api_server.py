@@ -11,48 +11,117 @@ from shared import (
     create_cell_data_dict,
     find_fastest_correct_per_prompt,
     get_unique_prompts_and_models,
-    group_results_by_file
+    group_results_by_file,
+    get_evaluated_report_path
 )
+from validation import FileOperationValidator, APIResponseValidator
 
 SERVER_PORT = DEFAULT_SERVER_PORT
 
 class APIHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
-        parsed_path = urlparse(self.path)
+        try:
+            parsed_path = urlparse(self.path)
+            
+            # Validate path for security
+            self._validate_path(parsed_path.path)
+            
+            # API endpoint for results
+            if parsed_path.path == '/api/results':
+                self.handle_api_request()
+            else:
+                self.send_error(404, "API endpoint not found. Use /api/results for evaluation data.")
+        except ValueError as e:
+            self.send_error(400, f"Invalid request: {e}")
+        except Exception as e:
+            self.send_error(500, f"Internal server error: {e}")
+    
+    def _validate_path(self, path: str):
+        """Validate request path for security."""
+        if not path or not isinstance(path, str):
+            raise ValueError("Invalid path")
         
-        # API endpoint for results
-        if parsed_path.path == '/api/results':
-            self.handle_api_request()
-        else:
-            self.send_error(404, "API endpoint not found. Use /api/results for evaluation data.")
+        # Check for path traversal
+        if '..' in path or path.startswith('//'):
+            raise ValueError("Path traversal detected")
+        
+        # Only allow specific endpoints
+        allowed_endpoints = {'/api/results', '/'}
+        if path not in allowed_endpoints and not path.startswith('/static/'):
+            raise ValueError("Endpoint not allowed")
     
     def handle_api_request(self):
         """Handle API requests for evaluation results."""
         try:
-            with open(EVALUATED_REPORT_PATH, 'r', encoding='utf-8') as f:
+            # Allow custom report path via query parameter
+            parsed_path = urlparse(self.path)
+            query_params = parse_qs(parsed_path.query)
+            custom_report = query_params.get('report', [None])[0]
+            
+            # Get the appropriate report path
+            report_path_str = get_evaluated_report_path(custom_report)
+            
+            # Validate file path and size
+            report_path = FileOperationValidator.validate_file_path(report_path_str)
+            FileOperationValidator.validate_file_size(report_path)
+            
+            with open(report_path, 'r', encoding='utf-8') as f:
                 results = json.load(f)
+            
+            # Validate results structure
+            if not isinstance(results, list):
+                raise ValueError("Invalid results format")
+            
+            # Sanitize and validate results
+            sanitized_results = []
+            for result in results:
+                if not isinstance(result, dict):
+                    continue
+                
+                # Validate required fields
+                required_fields = {'model', 'file', 'correct', 'response_time'}
+                if not required_fields.issubset(result.keys()):
+                    continue
+                
+                # Sanitize content fields
+                if 'prompt' in result:
+                    result['prompt'] = APIResponseValidator.sanitize_content(result['prompt'], 5000)
+                if 'expected' in result:
+                    result['expected'] = APIResponseValidator.sanitize_content(result['expected'], 5000)
+                if 'generated' in result:
+                    result['generated'] = APIResponseValidator.sanitize_content(result['generated'], 5000)
+                
+                sanitized_results.append(result)
             
             # Prepare API response with all necessary data
             api_response = {
-                'results': results,
-                'summary': self.prepare_summary_data(results),
-                'matrix': self.prepare_matrix_data(results),
-                'details': self.prepare_details_data(results),
+                'results': sanitized_results,
+                'summary': self.prepare_summary_data(sanitized_results),
+                'matrix': self.prepare_matrix_data(sanitized_results),
+                'details': self.prepare_details_data(sanitized_results),
                 'metadata': {
-                    'total_results': len(results),
-                    'models': list(set(r['model'] for r in results)),
-                    'files': list(set(r['file'] for r in results))
+                    'total_results': len(sanitized_results),
+                    'models': list(set(r['model'] for r in sanitized_results)),
+                    'files': list(set(r['file'] for r in sanitized_results))
                 }
             }
+            
+            # Validate response size
+            response_json = json.dumps(api_response)
+            if len(response_json.encode('utf-8')) > 50 * 1024 * 1024:  # 50MB limit
+                raise ValueError("Response too large")
             
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('X-Content-Type-Options', 'nosniff')
             self.end_headers()
-            self.wfile.write(json.dumps(api_response).encode('utf-8'))
+            self.wfile.write(response_json.encode('utf-8'))
             
         except FileNotFoundError:
             self.send_error(404, "Evaluation results not found. Please run the evaluation first.")
+        except ValueError as e:
+            self.send_error(400, f"Validation error: {e}")
         except Exception as e:
             self.send_error(500, f"Internal server error: {e}")
     

@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
 import re
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -11,6 +12,7 @@ from shared import GENERATED_ANSWERS_DIR, EVALUATED_REPORT_PATH, RAW_REPORT_PATH
 from api_client import get_model_response, evaluate_correctness
 from file_utils import get_prompt_files, read_file_content, save_raw_results, load_raw_results, save_evaluated_results, load_evaluated_results, ensure_directory_exists
 from reporting import format_detailed_table, format_matrix_table, format_summary_table
+from validation import ConfigValidation, FileOperationValidator, validate_glob_pattern, validate_model_list
 
 # --- Constants ---
 
@@ -37,53 +39,27 @@ class Config:
     actions: List[str] = field(default_factory=list)
     api_key: str = None
     throttling_secs: float = DEFAULT_THROTTLING_SECS
+    custom_report_json: str = None
     
     def validate(self) -> List[str]:
-        """Validate configuration and return list of errors."""
-        errors = []
-        
-        # Validate endpoint URL
-        if not self.endpoint_url:
-            errors.append("endpoint_url cannot be empty")
-        elif not re.match(r'^https?://', self.endpoint_url):
-            errors.append("endpoint_url must start with http:// or https://")
-        
-        # Validate model names
-        if not self.model_names:
-            errors.append("model_names cannot be empty")
-        else:
-            for model_name in self.model_names:
-                if not model_name or not model_name.strip():
-                    errors.append("model names cannot be empty strings")
-        
-        # Validate model evaluator
-        if not self.model_evaluator or not self.model_evaluator.strip():
-            errors.append("model_evaluator cannot be empty")
-        
-        # Validate actions
-        valid_actions = {"answer", "evaluate", "render", "serve"}
-        if not self.actions:
-            errors.append("actions cannot be empty")
-        else:
-            for action in self.actions:
-                if action not in valid_actions:
-                    errors.append(f"Invalid action '{action}'. Valid actions: {', '.join(valid_actions)}")
-        
-        # Validate throttling
-        if self.throttling_secs < 0:
-            errors.append("throttling_secs must be non-negative")
-        
-        # Validate directories
-        if not self.prompt_dir:
-            errors.append("prompt_dir cannot be empty")
-        if not self.answer_dir:
-            errors.append("answer_dir cannot be empty")
-        
-        # Validate pattern
-        if not self.pattern:
-            errors.append("pattern cannot be empty")
-        
-        return errors
+        """Validate configuration using Pydantic models."""
+        try:
+            # Use Pydantic for comprehensive validation
+            config_validation = ConfigValidation(
+                endpoint_url=self.endpoint_url,
+                model_names=self.model_names,
+                model_evaluator=self.model_evaluator,
+                pattern=self.pattern,
+                actions=self.actions,
+                api_key=self.api_key,
+                throttling_secs=self.throttling_secs,
+                prompt_dir=self.prompt_dir,
+                answer_dir=self.answer_dir
+            )
+            # If validation passes, return empty errors list
+            return []
+        except Exception as e:
+            return [str(e)]
 
 def load_config() -> Config:
     """Loads configuration from environment variables and command-line arguments."""
@@ -92,32 +68,71 @@ def load_config() -> Config:
     parser = argparse.ArgumentParser(description="Test models on prompts with optional filtering.")
     parser.add_argument('--pattern', type=str, default="prompts/*", help="Glob pattern to filter prompt files (e.g., '*CODE*')")
     parser.add_argument('--actions', type=str, default="answer,evaluate,render,serve", help="Comma-separated list of actions to perform (answer,evaluate,render,serve)")
+    parser.add_argument('--report-json', type=str, help="Path to custom JSON report file (overrides default)")
     args = parser.parse_args()
 
-    model_names_str = os.getenv("MODEL_NAMES", "gemma-3-270m-it-Q4_K_M,Qwen3-8B-Q4_K_M")
-    model_names = [name.strip() for name in model_names_str.split(",") if name.strip()]
+    try:
+        # Validate and parse pattern
+        pattern = validate_glob_pattern(args.pattern)
+        
+        # Validate and parse model names
+        model_names_str = os.getenv("MODEL_NAMES", "gemma-3-270m-it-Q4_K_M,Qwen3-8B-Q4_K_M")
+        model_names = validate_model_list(model_names_str)
+        
+        # Parse and validate actions
+        actions_str = args.actions
+        actions = [action.strip() for action in actions_str.split(',') if action.strip()]
+        
+        # Parse throttling with validation
+        throttling_str = os.getenv("THROTTLING_SECS", str(DEFAULT_THROTTLING_SECS))
+        try:
+            throttling_secs = float(throttling_str)
+            if throttling_secs < 0:
+                raise ValueError("throttling_secs must be non-negative")
+        except ValueError as e:
+            raise ValueError(f"Invalid THROTTLING_SECS: {e}")
 
-    config = Config(
-        prompt_dir=DEFAULT_PROMPT_DIR,
-        answer_dir=DEFAULT_ANSWER_DIR,
-        endpoint_url=os.getenv("ENDPOINT_URL", DEFAULT_ENDPOINT_URL),
-        model_names=model_names,
-        model_evaluator=os.getenv("MODEL_EVALUATOR", DEFAULT_MODEL_EVALUATOR),
-        pattern=args.pattern,
-        actions=[action.strip() for action in args.actions.split(',')],
-        api_key=os.getenv("API_KEY"),
-        throttling_secs=float(os.getenv("THROTTLING_SECS", str(DEFAULT_THROTTLING_SECS)))
-    )
-    
-    # Validate configuration
-    errors = config.validate()
-    if errors:
-        print("Configuration validation errors:")
-        for error in errors:
-            print(f"  - {error}")
+        config = Config(
+            prompt_dir=DEFAULT_PROMPT_DIR,
+            answer_dir=DEFAULT_ANSWER_DIR,
+            endpoint_url=os.getenv("ENDPOINT_URL", DEFAULT_ENDPOINT_URL),
+            model_names=model_names,
+            model_evaluator=os.getenv("MODEL_EVALUATOR", DEFAULT_MODEL_EVALUATOR),
+            pattern=pattern,
+            actions=actions,
+            api_key=os.getenv("API_KEY"),
+            throttling_secs=throttling_secs
+        )
+        
+        # Store custom report path if provided
+        if args.report_json:
+            config.custom_report_json = args.report_json
+        
+        # Validate configuration using Pydantic
+        errors = config.validate()
+        if errors:
+            print("❌ Configuration validation errors:")
+            for error in errors:
+                print(f"  - {error}")
+            exit(1)
+        
+        # Validate directories exist
+        prompt_path = Path(config.prompt_dir)
+        if not prompt_path.exists():
+            print(f"ℹ️  Info: Prompt directory '{config.prompt_dir}' does not exist - will be created if needed")
+        
+        answer_path = Path(config.answer_dir)
+        if not answer_path.exists():
+            print(f"ℹ️  Info: Answer directory '{config.answer_dir}' does not exist - will be created if needed")
+        
+        return config
+        
+    except ValueError as e:
+        print(f"❌ Configuration error: {e}")
         exit(1)
-    
-    return config
+    except Exception as e:
+        print(f"❌ Unexpected configuration error: {e}")
+        exit(1)
 
 # --- Action Functions ---
 
@@ -126,15 +141,34 @@ def load_config() -> Config:
 
 def answer_prompt(prompt_path: str, model_name: str, config: Config) -> Dict[str, Any]:
     """Processes a single prompt file and returns the generated answer."""
-    base_name = os.path.basename(prompt_path)
-    answer_path = os.path.join(config.answer_dir, base_name)
+    try:
+        # Validate file paths for security
+        validated_prompt_path = FileOperationValidator.validate_file_path(prompt_path, config.prompt_dir)
+        base_name = os.path.basename(prompt_path)
+        answer_path = os.path.join(config.answer_dir, base_name)
+        validated_answer_path = FileOperationValidator.validate_file_path(answer_path, config.answer_dir)
 
-    if not os.path.exists(answer_path):
-        print(f"Skipping {base_name}: No matching answer file found.")
+        if not validated_answer_path.exists():
+            print(f"Skipping {base_name}: No matching answer file found.")
+            return None
+
+        # Validate file sizes
+        FileOperationValidator.validate_file_size(validated_prompt_path)
+        FileOperationValidator.validate_file_size(validated_answer_path)
+
+        prompt = read_file_content(prompt_path)
+        expected_answer = read_file_content(answer_path)
+        
+        # Validate content length
+        prompt = FileOperationValidator.validate_content_length(prompt, 10000)
+        expected_answer = FileOperationValidator.validate_content_length(expected_answer, 10000)
+        
+    except ValueError as e:
+        print(f"Skipping {prompt_path}: {e}")
         return None
-
-    prompt = read_file_content(prompt_path)
-    expected_answer = read_file_content(answer_path)
+    except Exception as e:
+        print(f"Error validating files for {prompt_path}: {e}")
+        return None
 
     start_time = time.time()
     try:

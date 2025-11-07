@@ -5,29 +5,29 @@ export const useApi = (url) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const result = await response.json();
-        setData(result);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    };
+      const result = await response.json();
+      setData(result);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     if (url) {
       fetchData();
     }
   }, [url]);
 
-  return { data, loading, error, refetch: () => fetchData() };
+  return { data, loading, error, refetch: fetchData };
 };
 
 export const useJsonFile = (filename) => {
@@ -35,30 +35,30 @@ export const useJsonFile = (filename) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const fetchJsonFile = async () => {
+    if (!filename) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/json/${filename}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const result = await response.json();
+      setData(result);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchJsonFile = async () => {
-      if (!filename) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/json/${filename}`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const result = await response.json();
-        setData(result);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchJsonFile();
   }, [filename]);
 
-  return { data, loading, error, refetch: () => fetchJsonFile() };
+  return { data, loading, error, refetch: fetchJsonFile };
 };

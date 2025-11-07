@@ -154,9 +154,131 @@ Model Performance Summary
 - **Dependencies**: If uv is not installed, download it from [astral-sh/uv](https://github.com/astral-sh/uv).
 - **Customization**: Modify `main.py` for advanced features, like adding more metrics or output formats.
 
+## Testing
+
+This project includes comprehensive testing for both backend and frontend components.
+
+### Backend Testing
+
+The backend uses **pytest** for unit and integration testing. Test configuration is already set up in `pyproject.toml`.
+
+#### Running Backend Tests
+
+```bash
+# Run all tests with coverage
+uv run pytest
+
+# Run tests with verbose output
+uv run pytest -v
+
+# Run specific test file
+uv run pytest tests/unit/test_main.py
+
+# Run tests with coverage report
+uv run pytest --cov=. --cov-report=html
+
+# Run only unit tests
+uv run pytest -m unit
+
+# Run only integration tests
+uv run pytest -m integration
+```
+
+#### Test Structure
+
+- `tests/unit/` - Unit tests for individual modules
+- `tests/conftest.py` - Shared test fixtures and configuration
+- `tests/test_*.py` - Test files following pytest conventions
+
+#### Available Test Markers
+
+- `@pytest.mark.unit` - Unit tests (fast, isolated)
+- `@pytest.mark.integration` - Integration tests (slower, external dependencies)
+- `@pytest.mark.slow` - Slow-running tests
+
+#### Coverage Requirements
+
+Tests are configured to require minimum 80% code coverage. Coverage reports are generated in:
+- Terminal output
+- `htmlcov/` directory (HTML report)
+- `coverage.xml` (XML format for CI/CD)
+
+### Frontend Testing
+
+The frontend uses **Vitest** with React Testing Library for component testing.
+
+#### Running Frontend Tests
+
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Run all tests in watch mode
+npm run test
+
+# Run tests once
+npm run test:run
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run tests with UI interface
+npm run test:ui
+
+# Run tests while watching for changes
+npm run test:watch
+```
+
+#### Test Structure
+
+- `src/test/` - Test files and setup
+- `src/test/setup.js` - Test environment configuration
+- `*.test.jsx` - Component test files
+- `*.test.js` - Hook and utility test files
+
+#### Frontend Test Features
+
+- Component rendering tests
+- User interaction simulation
+- Hook testing with custom mocks
+- Dark mode functionality testing
+- Filter and state management testing
+- API integration testing with mocks
+
+### Test Development Guidelines
+
+#### Backend Tests
+
+1. Use descriptive test names that explain what is being tested
+2. Mock external dependencies (API calls, file I/O)
+3. Test both success and failure scenarios
+4. Use fixtures for reusable test data
+5. Follow the Arrange-Act-Assert pattern
+
+#### Frontend Tests
+
+1. Test user behavior, not implementation details
+2. Use React Testing Library queries that resemble user interactions
+3. Mock external dependencies (API calls, hooks)
+4. Test accessibility aspects
+5. Cover both happy paths and error states
+
+### Continuous Integration
+
+Both test suites are configured for CI/CD integration:
+
+- Backend: pytest with coverage reporting
+- Frontend: Vitest with coverage reporting
+- Coverage thresholds enforced to maintain code quality
+
 ## Contributing
 
-Feel free to open issues or pull requests for improvements.
+Feel free to open issues or pull requests for improvements. When contributing:
+
+1. Add tests for new functionality
+2. Ensure all tests pass before submitting
+3. Maintain or improve code coverage
+4. Follow existing code style and patterns
 
 ## License
 

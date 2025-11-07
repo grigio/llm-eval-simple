@@ -6,6 +6,10 @@ from typing import Any, Dict, List, Tuple
 GENERATED_ANSWERS_DIR = "answers-generated"
 RAW_REPORT_PATH = os.path.join(GENERATED_ANSWERS_DIR, "report.json")
 EVALUATED_REPORT_PATH = os.path.join(GENERATED_ANSWERS_DIR, "report-evaluated.json")
+
+def get_evaluated_report_path(custom_path: str = None) -> str:
+    """Get the evaluated report path, allowing custom override."""
+    return custom_path if custom_path else EVALUATED_REPORT_PATH
 HTML_REPORT_PATH = os.path.join(GENERATED_ANSWERS_DIR, "report-evaluated.html")
 
 # Server constants
