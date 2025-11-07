@@ -1,5 +1,8 @@
 # LLM Eval Simple
 
+[![Python Version](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ![benchmark report](./static/benchmark-report.png)
 
 A simple tool for evaluating Large Language Models (LLMs) using a set of prompts and expected answers. It supports testing multiple models via an OpenAI-compatible API endpoint, measures response times, evaluates correctness (using an optional evaluator model or exact matching), and generates a summary report in tabular format.
@@ -8,15 +11,52 @@ This script is useful for benchmarking LLM performance on custom datasets, such 
 
 ## Features
 
-- Batch testing of multiple models.
-- Automatic evaluation using an evaluator model or fallback to exact string matching.
-- Response time tracking.
-- Detailed per-prompt results and aggregated summary tables.
-- Configurable via environment variables (e.g., model names, API endpoint).
+- **Batch Testing**: Evaluate multiple LLM models simultaneously
+- **Flexible Evaluation**: Use AI evaluator models or exact string matching
+- **Performance Metrics**: Track response times and accuracy
+- **Rich Reporting**: Detailed tables and summary statistics
+- **Web Dashboard**: Interactive visualization of results
+- **Configurable**: Environment-based configuration for different setups
+
+## Quick Start
+
+```bash
+# Install dependencies
+uv sync
+
+# Copy environment configuration
+cp .env.example .env
+
+# Edit .env with your API endpoint and model names
+# Then run evaluation
+uv run python main.py
+
+# Start web dashboard
+./start-dashboard.sh
+```
+
+## Project Structure
+
+```
+llm-eval-simple/
+├── main.py                 # Main evaluation script
+├── api_server.py          # REST API server
+├── server.py               # Web server for dashboard
+├── api_client.py           # OpenAI-compatible API client
+├── reporting.py            # Result formatting and display
+├── validation.py           # Input validation utilities
+├── file_utils.py           # File operations and utilities
+├── shared.py               # Shared constants and utilities
+├── prompts/                # Input prompt files
+├── answers/                # Expected answer files
+├── frontend/               # React dashboard application
+├── tests/                  # Backend test suite
+└── static/                 # Static assets
+```
 
 ## Prerequisites
 
-- Python 3.8+.
+- Python 3.13+.
 - [uv](https://github.com/astral-sh/uv) installed for dependency management (a fast alternative to pip and venv).
 - Access to an OpenAI-compatible API endpoint (e.g., local server or hosted service) for model inference.
 - Directories for prompts and answers (created automatically if missing).
@@ -73,12 +113,20 @@ This script is useful for benchmarking LLM performance on custom datasets, such 
 
 ### Running Evaluations
 
-Run the evaluation script:
+Run the evaluation script with customizable actions:
 
 ```bash
+# Run all actions (answer, evaluate, render, serve)
 uv run python main.py
-# you can activate the actions separately and also the prompts
-uv run main.py --actions answer,evaluate,serve --pattern "prompts/REASON*"
+
+# Run specific actions with pattern filtering
+uv run python main.py --actions answer,evaluate,serve --pattern "prompts/REASON*"
+
+# Available actions:
+# - answer: Generate model responses for prompts
+# - evaluate: Evaluate correctness of responses
+# - render: Display results in terminal
+# - serve: Start web dashboard
 ```
 
 ### Starting the Dashboard
@@ -156,129 +204,50 @@ Model Performance Summary
 
 ## Testing
 
-This project includes comprehensive testing for both backend and frontend components.
+The project includes comprehensive testing with 80%+ code coverage.
 
-### Backend Testing
-
-The backend uses **pytest** for unit and integration testing. Test configuration is already set up in `pyproject.toml`.
-
-#### Running Backend Tests
+### Backend Tests (pytest)
 
 ```bash
 # Run all tests with coverage
 uv run pytest
 
-# Run tests with verbose output
-uv run pytest -v
-
 # Run specific test file
 uv run pytest tests/unit/test_main.py
 
-# Run tests with coverage report
+# Run with coverage report
 uv run pytest --cov=. --cov-report=html
-
-# Run only unit tests
-uv run pytest -m unit
-
-# Run only integration tests
-uv run pytest -m integration
 ```
 
-#### Test Structure
-
-- `tests/unit/` - Unit tests for individual modules
-- `tests/conftest.py` - Shared test fixtures and configuration
-- `tests/test_*.py` - Test files following pytest conventions
-
-#### Available Test Markers
-
-- `@pytest.mark.unit` - Unit tests (fast, isolated)
-- `@pytest.mark.integration` - Integration tests (slower, external dependencies)
-- `@pytest.mark.slow` - Slow-running tests
-
-#### Coverage Requirements
-
-Tests are configured to require minimum 80% code coverage. Coverage reports are generated in:
-- Terminal output
-- `htmlcov/` directory (HTML report)
-- `coverage.xml` (XML format for CI/CD)
-
-### Frontend Testing
-
-The frontend uses **Vitest** with React Testing Library for component testing.
-
-#### Running Frontend Tests
+### Frontend Tests (Vitest)
 
 ```bash
-# Navigate to frontend directory
 cd frontend
 
-# Run all tests in watch mode
-npm run test
-
-# Run tests once
+# Run all tests
 npm run test:run
 
-# Run tests with coverage
+# Run with coverage
 npm run test:coverage
 
-# Run tests with UI interface
-npm run test:ui
-
-# Run tests while watching for changes
-npm run test:watch
+# Run in watch mode
+npm run test
 ```
 
-#### Test Structure
-
-- `src/test/` - Test files and setup
-- `src/test/setup.js` - Test environment configuration
-- `*.test.jsx` - Component test files
-- `*.test.js` - Hook and utility test files
-
-#### Frontend Test Features
-
-- Component rendering tests
-- User interaction simulation
-- Hook testing with custom mocks
-- Dark mode functionality testing
-- Filter and state management testing
-- API integration testing with mocks
-
-### Test Development Guidelines
-
-#### Backend Tests
-
-1. Use descriptive test names that explain what is being tested
-2. Mock external dependencies (API calls, file I/O)
-3. Test both success and failure scenarios
-4. Use fixtures for reusable test data
-5. Follow the Arrange-Act-Assert pattern
-
-#### Frontend Tests
-
-1. Test user behavior, not implementation details
-2. Use React Testing Library queries that resemble user interactions
-3. Mock external dependencies (API calls, hooks)
-4. Test accessibility aspects
-5. Cover both happy paths and error states
-
-### Continuous Integration
-
-Both test suites are configured for CI/CD integration:
-
-- Backend: pytest with coverage reporting
-- Frontend: Vitest with coverage reporting
-- Coverage thresholds enforced to maintain code quality
+Test structure: `tests/unit/` for backend, `src/test/` for frontend. Both support unit and integration tests with proper mocking.
 
 ## Contributing
 
-Feel free to open issues or pull requests for improvements. When contributing:
+We welcome contributions! Please:
 
-1. Add tests for new functionality
-2. Ensure all tests pass before submitting
-3. Maintain or improve code coverage
-4. Follow existing code style and patterns
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Add tests for new functionality
+4. Ensure all tests pass (`uv run pytest && cd frontend && npm run test:run`)
+5. Follow existing code style and patterns
+6. Submit a pull request
+
+For questions or issues, please open a GitHub issue.
 
 ## License
 
