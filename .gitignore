@@ -22,6 +22,11 @@ frontend/.env.development.local
 frontend/.env.test.local
 frontend/.env.production.local
 
+# Coverage reports
+coverage.xml
+htmlcov/
+.coverage
+
 # IDE and editor files
 .vscode/
 .idea/
