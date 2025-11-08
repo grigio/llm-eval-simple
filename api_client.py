@@ -82,7 +82,8 @@ def evaluate_correctness(endpoint_url: str, evaluator_model: str, expected_answe
     try:
         # Validate inputs
         if not expected_answer or not generated_answer:
-            raise ValueError("Both expected_answer and generated_answer are required")
+            # Return False for empty answers instead of raising an error
+            return False
         
         # Simple string comparison if no evaluator model
         if not evaluator_model:
@@ -125,8 +126,6 @@ def evaluate_correctness(endpoint_url: str, evaluator_model: str, expected_answe
         return False
         
     except ValueError as e:
-        if "Both expected_answer and generated_answer are required" in str(e):
-            raise  # Re-raise validation errors for required parameters
         print(f"❌ Evaluation validation error: {e}")
         return False
     except Exception as e:

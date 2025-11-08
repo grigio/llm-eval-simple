@@ -17,6 +17,29 @@ export const ModelAnswersAccordion = ({ results }) => {
     resultsByModel[result.model].push(result);
   });
 
+  // Calculate fastest correct answers count per model
+  const calculateFastestCorrectCount = (modelResults, modelName) => {
+    // Group all results by file to find fastest correct answer per file
+    const fastestByFile = {};
+    results.forEach(result => {
+      if (result.correct) {
+        if (!fastestByFile[result.file] || result.response_time < fastestByFile[result.file].response_time) {
+          fastestByFile[result.file] = result;
+        }
+      }
+    });
+    
+    // Count how many files where this model is the fastest correct
+    let fastestCorrectCount = 0;
+    Object.values(fastestByFile).forEach(fastest => {
+      if (fastest.model === modelName) {
+        fastestCorrectCount++;
+      }
+    });
+    
+    return fastestCorrectCount;
+  };
+
   const toggleModel = (modelName) => {
     const newExpanded = new Set(expandedModels);
     if (newExpanded.has(modelName)) {
@@ -57,8 +80,14 @@ export const ModelAnswersAccordion = ({ results }) => {
                   <span className="text-sm text-green-600 dark:text-green-400">
                     {modelResults.filter(r => r.correct).length} correct
                   </span>
+                  <span className="text-sm text-yellow-600 dark:text-yellow-400">
+                    / {calculateFastestCorrectCount(modelResults, modelName)} ✦
+                  </span>
                   <span className="text-sm text-red-600 dark:text-red-400">
-                    {modelResults.filter(r => !r.correct).length} incorrect
+                    / {modelResults.filter(r => !r.correct).length} incorrect
+                  </span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    ({modelResults.reduce((sum, r) => sum + (typeof r.response_time === 'number' ? r.response_time : 0), 0).toFixed(1)}s)
                   </span>
                 </div>
               </button>
