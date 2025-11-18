@@ -53,17 +53,6 @@ export const QuestionDetails = ({ results }) => {
                     </pre>
                   </div>
                   
-                  <div>
-                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
-                      Expected Answer:
-                    </h4>
-                    <pre className="bg-gray-100 dark:bg-gray-800 p-3 rounded text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                      {data.expected}
-                    </pre>
-                  </div>
-                  
-                  <hr className="border-gray-200 dark:border-gray-700" />
-                  
                   <div className="space-y-3">
                     {data.models.map((modelResult, index) => (
                       <div 
@@ -74,20 +63,40 @@ export const QuestionDetails = ({ results }) => {
                             : 'bg-red-50 dark:bg-red-900/20 border-red-500'
                         }`}
                       >
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                        <h4 className="font-semibold text-gray-900 dark:text-white mb-3">
                           {modelResult.model}
                         </h4>
-                        <div className="mb-2">
-                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                            Generated Answer:
-                          </span>
-                          <pre className="mt-1 bg-white dark:bg-gray-800 p-3 rounded text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                            {modelResult.generated}
-                          </pre>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                              Expected Answer:
+                            </span>
+                            <pre className="mt-1 bg-gray-100 dark:bg-gray-800 p-3 rounded text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                              {data.expected}
+                            </pre>
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                              Generated Answer:
+                            </span>
+                            <pre className="mt-1 bg-white dark:bg-gray-800 p-3 rounded text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                              {modelResult.generated}
+                            </pre>
+                          </div>
                         </div>
                         <div className="text-sm text-gray-600 dark:text-gray-400">
                           <em>Response Time: {modelResult.response_time.toFixed(2)}s</em>
                         </div>
+                        {modelResult.note && (
+                          <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                            <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                              Note:
+                            </span>
+                            <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-300">
+                              {modelResult.note}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

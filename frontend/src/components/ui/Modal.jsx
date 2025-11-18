@@ -4,14 +4,14 @@ import { useEffect } from 'react';
 export const Modal = ({ isOpen, onClose, title, children, showNavigation = false, onPrev = () => {}, onNext = () => {}, navLabel = null }) => {
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (!isOpen) return;
-      
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && isOpen) {
         onClose();
-      } else if (e.key === 'ArrowLeft' && showNavigation) {
-        onPrev();
-      } else if (e.key === 'ArrowRight' && showNavigation) {
-        onNext();
+      } else if (showNavigation && isOpen) {
+        if (e.key === 'ArrowLeft') {
+          onPrev();
+        } else if (e.key === 'ArrowRight') {
+          onNext();
+        }
       }
     };
 
