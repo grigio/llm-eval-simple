@@ -3,15 +3,21 @@ import { useEffect } from 'react';
 
 export const Modal = ({ isOpen, onClose, title, children, showNavigation = false, onPrev = () => {}, onNext = () => {}, navLabel = null }) => {
   useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === 'Escape' && isOpen) {
+    const handleKeyDown = (e) => {
+      if (!isOpen) return;
+      
+      if (e.key === 'Escape') {
         onClose();
+      } else if (e.key === 'ArrowLeft' && showNavigation) {
+        onPrev();
+      } else if (e.key === 'ArrowRight' && showNavigation) {
+        onNext();
       }
     };
 
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose, showNavigation, onPrev, onNext]);
 
   return isOpen ? (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
