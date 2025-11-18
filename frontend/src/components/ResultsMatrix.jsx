@@ -52,7 +52,8 @@ export const ResultsMatrix = ({ results }) => {
         expected: result.expected,
         response_time: result.response_time?.toFixed(2) + 's',
         correct: result.correct,
-        evaluator_model: result.evaluator_model
+        evaluator_model: result.evaluator_model,
+        note: result.note || ''
       });
     }
   };
@@ -81,7 +82,8 @@ export const ResultsMatrix = ({ results }) => {
         expected: result.expected,
         response_time: result.response_time?.toFixed(2) + 's',
         correct: result.correct,
-        evaluator_model: result.evaluator_model
+        evaluator_model: result.evaluator_model,
+        note: result.note || ''
       });
     }
   };
@@ -250,6 +252,19 @@ export const ResultsMatrix = ({ results }) => {
                 {selectedCell.generated}
               </pre>
             </div>
+            
+            {selectedCell.note && (
+              <div>
+                <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                  Evaluation Note:
+                </h4>
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-300">
+                    {selectedCell.note}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Modal>

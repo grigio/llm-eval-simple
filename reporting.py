@@ -15,7 +15,7 @@ from shared import (
 def create_detailed_table_data(results: List[Dict[str, Any]]) -> List[List[str]]:
     """Create data for the detailed results table."""
     return [
-        [r["model"], r["file"], "correct" if r["correct"] else "wrong", format_response_time(r["response_time"])]
+        [r["model"], r["file"], "correct" if r["correct"] else "wrong", format_response_time(r["response_time"]), r.get("note", "")]
         for r in results
     ]
 
@@ -70,7 +70,7 @@ def create_summary_table_data(results: List[Dict[str, Any]]) -> List[List[str]]:
 def format_detailed_table(results: List[Dict[str, Any]]) -> str:
     """Format the detailed results table."""
     table_data = create_detailed_table_data(results)
-    return tabulate(table_data, headers=["Model", "File", "Correct", "Response Time"], tablefmt="fancy_grid")
+    return tabulate(table_data, headers=["Model", "File", "Correct", "Response Time", "Note"], tablefmt="fancy_grid")
 
 
 def format_matrix_table(results: List[Dict[str, Any]]) -> str:

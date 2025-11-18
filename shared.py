@@ -135,6 +135,7 @@ def create_cell_data_dict(results: List[Dict[str, Any]]) -> Dict[str, Dict[str, 
             "file": r["file"],
             "generated": r["generated"],
             "response_time": format_response_time(r['response_time']),
-            "correct": r["correct"]
+            "correct": r["correct"],
+            "note": r.get("note", "")
         }
     return cell_data_dict

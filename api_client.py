@@ -77,17 +77,19 @@ def get_model_response(endpoint_url: str, model: str, prompt: str, api_key: str 
 
 def evaluate_correctness(endpoint_url: str, evaluator_model: str, expected_answer: str, 
                         generated_answer: str, api_key: str = None, 
-                        throttling_secs: float = 0.1) -> bool:
+                        throttling_secs: float = 0.1) -> tuple[bool, str]:
     """Evaluates the correctness of a generated answer using an evaluator model."""
     try:
         # Validate inputs
         if not expected_answer or not generated_answer:
             # Return False for empty answers instead of raising an error
-            return False
+            return False, "Both expected_answer and generated_answer are required"
         
         # Simple string comparison if no evaluator model
         if not evaluator_model:
-            return generated_answer.lower().strip() == expected_answer.lower().strip()
+            is_correct = generated_answer.lower().strip() == expected_answer.lower().strip()
+            note = "Exact string matching evaluation" if not is_correct else ""
+            return is_correct, note
 
         # Validate evaluation request
         eval_request = EvaluationRequest(
@@ -96,7 +98,7 @@ def evaluate_correctness(endpoint_url: str, evaluator_model: str, expected_answe
             evaluator_model=evaluator_model
         )
 
-        system_prompt = "You are an evaluator. Compare the expected answer with the generated answer. Ignore the tag content. The generated answers may vary slightly in wording but should preserve the original meaning. If the answers are equivalent in meaning, mark as correct. Respond with only 'CORRECT' or 'INCORRECT'."
+        system_prompt = "You are an evaluator. Compare the expected answer with the generated answer. Ignore the tag content. The generated answers may vary slightly in wording but should preserve the original meaning. If the answers are equivalent in meaning, mark as correct. Respond with only 'CORRECT' or 'INCORRECT'. If the answer is INCORRECT, provide a brief explanation of why on a new line starting with 'NOTE:'."
         user_prompt = f"Expected Answer: {eval_request.expected_answer}\nGenerated Answer: {eval_request.generated_answer}"
         
         # Get evaluation from model
@@ -115,19 +117,32 @@ def evaluate_correctness(endpoint_url: str, evaluator_model: str, expected_answe
         if not eval_result:
             raise ValueError("Empty evaluation response")
         
-        # More flexible evaluation - look for clear indicators of correctness
-        if "CORRECT" == eval_result:
-            return True
-        if "INCORRECT" == eval_result:
-            return False
-
-        # Default to incorrect if response is ambiguous
-        print(f"⚠️  Ambiguous evaluation response: '{eval_result}', marking as incorrect")
-        return False
+        # Parse evaluation result and optional note
+        lines = eval_result.split('\n')
+        is_correct = False
+        note = ""
+        
+        # Check first line for CORRECT/INCORRECT
+        if "CORRECT" == lines[0]:
+            is_correct = True
+        elif "INCORRECT" == lines[0]:
+            is_correct = False
+        else:
+            # Default to incorrect if response is ambiguous
+            print(f"⚠️  Ambiguous evaluation response: '{eval_result}', marking as incorrect")
+            is_correct = False
+        
+        # Extract note if present (starts with NOTE:)
+        for line in lines[1:]:
+            if line.strip().startswith('NOTE:'):
+                note = line.strip()[5:].strip()  # Remove 'NOTE:' prefix
+                break
+        
+        return is_correct, note
         
     except ValueError as e:
         print(f"❌ Evaluation validation error: {e}")
-        return False
+        return False, f"Evaluation validation error: {e}"
     except Exception as e:
         print(f"❌ Evaluation error: {e}")
-        return False
+        return False, f"Evaluation error: {e}"

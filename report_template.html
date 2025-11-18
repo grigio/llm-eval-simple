@@ -138,10 +138,12 @@
             const overlay = document.getElementById('overlay');
             const overlayData = document.getElementById('overlay-data');
             
+            let noteHtml = data.note ? `<p><strong>Note:</strong> ${data.note}</p>` : '';
             overlayData.innerHTML = `
                 <h3>${data.model} - ${data.file}</h3>
                 <p><strong>Status:</strong> ${data.correct ? 'Correct' : 'Incorrect'}</p>
                 <p><strong>Response Time:</strong> ${data.response_time}s</p>
+                ${noteHtml}
                 <h4>Generated Answer:</h4>
                 <pre></pre>
             `;

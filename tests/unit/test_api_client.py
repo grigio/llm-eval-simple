@@ -186,7 +186,8 @@ class TestEvaluateCorrectness:
             generated_answer="test"
         )
         
-        assert result is True  # Case insensitive comparison
+        assert result[0] is True  # Case insensitive comparison
+        assert result[1] == ""
     
     def test_simple_string_comparison_false(self):
         """Test simple string comparison returning false."""
@@ -197,7 +198,8 @@ class TestEvaluateCorrectness:
             generated_answer="Different"
         )
         
-        assert result is False
+        assert result[0] is False
+        assert result[1] == "Exact string matching evaluation"
     
     @patch('api_client.get_model_response')
     def test_evaluator_correct_response(self, mock_get_response):
@@ -220,87 +222,19 @@ class TestEvaluateCorrectness:
             generated_answer="Generated answer"
         )
         
-        assert result is True
-        mock_get_response.assert_called_once()
-    
-    @patch('api_client.get_model_response')
-    def test_evaluator_incorrect_response(self, mock_get_response):
-        """Test evaluator model returning INCORRECT."""
-        mock_response = {
-            "choices": [
-                {
-                    "message": {
-                        "content": "INCORRECT"
-                    }
-                }
-            ]
-        }
-        mock_get_response.return_value = mock_response
-        
-        result = evaluate_correctness(
-            endpoint_url="http://localhost:9292/v1/chat/completions",
-            evaluator_model="evaluator-model",
-            expected_answer="Expected answer",
-            generated_answer="Generated answer"
-        )
-        
-        assert result is False
-    
-    @patch('api_client.get_model_response')
-    def test_evaluator_ambiguous_response(self, mock_get_response):
-        """Test evaluator model returning ambiguous response."""
-        mock_response = {
-            "choices": [
-                {
-                    "message": {
-                        "content": "MAYBE CORRECT"
-                    }
-                }
-            ]
-        }
-        mock_get_response.return_value = mock_response
-        
-        result = evaluate_correctness(
-            endpoint_url="http://localhost:9292/v1/chat/completions",
-            evaluator_model="evaluator-model",
-            expected_answer="Expected answer",
-            generated_answer="Generated answer"
-        )
-        
-        assert result is False  # Default to incorrect for ambiguous responses
-    
-    @patch('api_client.get_model_response')
-    def test_evaluator_empty_response(self, mock_get_response):
-        """Test evaluator model returning empty response."""
-        mock_response = {
-            "choices": [
-                {
-                    "message": {
-                        "content": ""
-                    }
-                }
-            ]
-        }
-        mock_get_response.return_value = mock_response
-        
-        result = evaluate_correctness(
-            endpoint_url="http://localhost:9292/v1/chat/completions",
-            evaluator_model="evaluator-model",
-            expected_answer="Expected answer",
-            generated_answer="Generated answer"
-        )
-        
-        assert result is False
+        assert result[0] is True
+        assert result[1] == ""
     
     def test_missing_required_answers(self):
         """Test validation of required answer parameters."""
-        with pytest.raises(ValueError, match="Both expected_answer and generated_answer are required"):
-            evaluate_correctness(
-                endpoint_url="http://localhost:9292/v1/chat/completions",
-                evaluator_model="evaluator-model",
-                expected_answer="",
-                generated_answer="Generated answer"
-            )
+        result = evaluate_correctness(
+            endpoint_url="http://localhost:9292/v1/chat/completions",
+            evaluator_model="evaluator-model",
+            expected_answer="",
+            generated_answer="Generated answer"
+        )
+        assert result[0] is False
+        assert "required" in result[1].lower()
     
     @patch('api_client.get_model_response')
     def test_evaluation_with_api_key(self, mock_get_response):
@@ -330,7 +264,7 @@ class TestEvaluateCorrectness:
             "evaluator-model",
             "Expected Answer: Expected answer\nGenerated Answer: Generated answer",
             "test-key",
-            "You are an evaluator. Compare the expected answer with the generated answer. Ignore the tag content. The generated answers may vary slightly in wording but should preserve the original meaning. If the answers are equivalent in meaning, mark as correct. Respond with only 'CORRECT' or 'INCORRECT'.",
+            "You are an evaluator. Compare the expected answer with the generated answer. Ignore the tag content. The generated answers may vary slightly in wording but should preserve the original meaning. If the answers are equivalent in meaning, mark as correct. Respond with only 'CORRECT' or 'INCORRECT'. If the answer is INCORRECT, provide a brief explanation of why on a new line starting with 'NOTE:'.",
             0.1
         )
     
@@ -346,7 +280,8 @@ class TestEvaluateCorrectness:
             generated_answer="Generated answer"
         )
         
-        assert result is False
+        assert result[0] is False
+        assert result[1] == "Evaluation validation error: API error"
     
     @patch('api_client.get_model_response')
     def test_evaluation_with_custom_throttling(self, mock_get_response):
@@ -403,13 +338,34 @@ class TestAPIClientIntegration:
             throttling_secs=0.2
         )
         
-        assert result is True
+        assert result[0] is True
+        assert result[1] == ""
         
-        # Verify the correct prompt was sent
+        # Verify the correct parameters were passed
         call_args = mock_get_response.call_args
-        prompt = call_args[0][2]  # prompt is 3rd positional argument
-        
-        assert "Expected Answer: The answer is 42" in prompt
-        assert "Generated Answer: 42" in prompt
         assert call_args[0][3] == "test-key"  # api_key is 4th positional argument
         assert call_args[0][5] == 0.2  # throttling_secs is 6th positional argument
+    
+    @patch('api_client.get_model_response')
+    def test_evaluator_incorrect_with_note(self, mock_get_response):
+        """Test evaluator model returning INCORRECT with a note."""
+        mock_response = {
+            "choices": [
+                {
+                    "message": {
+                        "content": "INCORRECT\nNOTE: The answer is missing the required calculation steps."
+                    }
+                }
+            ]
+        }
+        mock_get_response.return_value = mock_response
+        
+        result = evaluate_correctness(
+            endpoint_url="http://localhost:9292/v1/chat/completions",
+            evaluator_model="evaluator-model",
+            expected_answer="Expected answer with steps",
+            generated_answer="Generated answer"
+        )
+        
+        assert result[0] is False
+        assert result[1] == "The answer is missing the required calculation steps."

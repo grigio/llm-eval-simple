@@ -220,7 +220,7 @@ def evaluate(config: Config):
 
     evaluated_results = []
     for result in results:
-        is_correct = evaluate_correctness(
+        is_correct, note = evaluate_correctness(
             config.endpoint_url,
             config.model_evaluator, 
             result["expected"], 
@@ -229,9 +229,12 @@ def evaluate(config: Config):
             config.throttling_secs
         )
         result["correct"] = is_correct
+        result["note"] = note
         result["evaluator_model"] = config.model_evaluator
         evaluated_results.append(result)
         print(f"Evaluated: {result['file']} for {result['model']} -> {'Correct' if is_correct else 'Incorrect'}")
+        if note:
+            print(f"  Note: {note}")
 
     save_evaluated_results(evaluated_results)
     print(f"\nEvaluation complete. Report saved to {EVALUATED_REPORT_PATH}")
