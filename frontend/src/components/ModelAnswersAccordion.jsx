@@ -53,11 +53,18 @@ export const ModelAnswersAccordion = ({ results }) => {
   return (
     <div className="card">
       <div className="p-6">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-          Model Answers Details
-        </h2>
+        <div className="flex items-center space-x-3 mb-4">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Model Answers Details
+          </h2>
+          {results[0]?.evaluator_model && (
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              (evaluated by {results[0].evaluator_model})
+            </span>
+          )}
+        </div>
         <div className="space-y-4">
-          {Object.entries(resultsByModel).map(([modelName, modelResults]) => (
+          {Object.entries(resultsByModel).sort(([a], [b]) => a.localeCompare(b)).map(([modelName, modelResults]) => (
             <div key={modelName} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
               <button
                 onClick={() => toggleModel(modelName)}
