@@ -96,6 +96,9 @@ export const ModelAnswersAccordion = ({ results }) => {
                   <span className="text-sm text-gray-600 dark:text-gray-400">
                     ({modelResults.reduce((sum, r) => sum + (typeof r.response_time === 'number' ? r.response_time : 0), 0).toFixed(1)}s)
                   </span>
+                  <span className="text-sm text-blue-600 dark:text-blue-400">
+                    [{(modelResults.filter(r => r.correct).length * 100 / modelResults.reduce((sum, r) => sum + (typeof r.response_time === 'number' ? r.response_time : 0), 0)).toFixed(2)}]
+                  </span>
                 </div>
               </button>
               
