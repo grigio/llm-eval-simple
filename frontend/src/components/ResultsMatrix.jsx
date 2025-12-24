@@ -163,9 +163,9 @@ export const ResultsMatrix = ({ results }) => {
             </div>
           </div>
           
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[80vh]">
             <table className="w-full min-w-[600px]">
-              <thead>
+              <thead className="sticky top-0 z-20">
                 <tr className="bg-gray-50 dark:bg-gray-700">
                   <th className="table-cell font-semibold text-gray-900 dark:text-white sticky left-0 bg-gray-50 dark:bg-gray-700 z-10">
                     Model
