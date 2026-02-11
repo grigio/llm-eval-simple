@@ -16,7 +16,7 @@ Modern React dashboard for LLM evaluation results with interactive charts and re
 
 ### Prerequisites
 
-- Node.js 16+ and npm
+- Node.js 16+ and bun
 - Python backend server running
 
 ### Setup
@@ -29,15 +29,15 @@ cd frontend
 ./setup.sh
 
 # Or manually:
-npm install
-npm run build
+bun install
+bun run build
 ```
 
 ### Development
 
 ```bash
 # Start development server with hot reload
-npm run dev
+bun run dev
 
 # In another terminal, start the backend
 cd ..
@@ -50,7 +50,7 @@ python api_server.py
 
 ```bash
 # Build for production
-npm run build
+bun run build
 
 # Start the enhanced backend server
 python api_server.py

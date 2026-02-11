@@ -33,10 +33,35 @@ for port in 4000 3000; do
     fi
 done
 
+# Determine how to run Python (prefer uv if available)
+PYTHON_CMD="python3"
+if command -v uv &> /dev/null; then
+    PYTHON_CMD="uv run python"
+    echo "✅ Using uv to run Python"
+else
+    echo "⚠️  uv not found, using python3 directly"
+    echo "   Consider installing uv: https://docs.astral.sh/uv/"
+fi
+
+# Check Python dependencies using the same interpreter we'll use to run
+echo "🔍 Checking Python dependencies..."
+if ! $PYTHON_CMD -c "import pydantic" 2>/dev/null; then
+    echo "❌ pydantic is not installed in the current Python environment."
+    echo "📦 Please install dependencies:"
+    if command -v uv &> /dev/null; then
+        echo "   uv sync"
+    else
+        echo "   pip3 install --break-system-packages fastapi uvicorn"
+    fi
+    echo ""
+    echo "Note: The project uses 'uv' as the package manager."
+    exit 1
+fi
+
 # Start API server with retry mechanism
 echo "🔧 Starting API server on port 4000..."
 for attempt in {1..3}; do
-    uv run python api_server.py &
+    $PYTHON_CMD api_server.py &
     API_PID=$!
     
     # Verify the process actually started
@@ -75,7 +100,7 @@ done
 # Start frontend
 echo "🎨 Starting frontend on port 3000..."
 cd frontend
-npm run dev &
+bun run dev &
 FRONTEND_PID=$!
 
 echo ""
