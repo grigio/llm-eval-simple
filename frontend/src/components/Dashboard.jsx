@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { ResultsMatrix } from './ResultsMatrix';
 import { ModelAnswersAccordion } from './ModelAnswersAccordion';
 import { DarkModeToggle } from './ui/DarkModeToggle';
+import { AccuracyVsTimeChart } from './Charts/AccuracyVsTimeChart';
 
 export const Dashboard = () => {
   const [renderFile, setRenderFile] = useState(null);
@@ -101,6 +102,9 @@ export const Dashboard = () => {
           
           {/* Heatmap Results Display */}
           <ResultsMatrix results={results} />
+          
+          {/* Accuracy vs Time Chart */}
+          <AccuracyVsTimeChart results={results} />
           
           {/* Model Answers Accordion */}
           <ModelAnswersAccordion results={results} />
